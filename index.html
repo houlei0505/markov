@@ -257,6 +257,11 @@
       h1 { font-size: 1.2rem; }
       .card { padding: 14px 14px; }
     }
+
+    .collapsible { cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+    .collapsible:hover { color: #a78bfa; }
+    .toggle-icon { font-size: 0.75rem; color: #4a4a6a; transition: transform 0.2s; }
+    .collapsed .toggle-icon { transform: rotate(-90deg); }
   </style>
 </head>
 <body>
@@ -310,21 +315,9 @@
   </div>
 </div>
 
-<!-- 统计卡片 -->
-<div class="card" id="statsCard" style="display:none">
-  <h2>③ 序列统计</h2>
-  <div class="stats-row" id="statsRow"></div>
-</div>
-
-<!-- 转移矩阵卡片 -->
-<div class="card" id="matrixCard" style="display:none">
-  <h2>④ 马尔可夫转移矩阵</h2>
-  <div class="matrix-wrap" id="matrixWrap"></div>
-</div>
-
 <!-- 预测卡片 -->
 <div class="card" id="predictCard" style="display:none">
-  <h2>⑤ 后续走势预测与凯利建议</h2>
+  <h2>📊 预测结果</h2>
   <div class="predict-header">
     <span id="predictNote" class="note"></span>
   </div>
@@ -332,7 +325,32 @@
   <div class="kelly-summary" id="kellySummary"></div>
 </div>
 
+<!-- 统计卡片（折叠） -->
+<div class="card" id="statsCard" style="display:none">
+  <h2 class="collapsible" onclick="toggleCard('statsBody')">③ 序列统计 <span class="toggle-icon">▼</span></h2>
+  <div id="statsBody">
+    <div class="stats-row" id="statsRow"></div>
+  </div>
+</div>
+
+<!-- 转移矩阵卡片（折叠） -->
+<div class="card" id="matrixCard" style="display:none">
+  <h2 class="collapsible" onclick="toggleCard('matrixBody')">④ 马尔可夫转移矩阵 <span class="toggle-icon">▼</span></h2>
+  <div id="matrixBody">
+    <div class="matrix-wrap" id="matrixWrap"></div>
+  </div>
+</div>
+
 <script>
+// ── 折叠 ──────────────────────────────────────
+function toggleCard(bodyId) {
+  const body = document.getElementById(bodyId);
+  const h2 = body.previousElementSibling;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  h2.classList.toggle('collapsed', !collapsed);
+}
+
 // ── 工具 ──────────────────────────────────────
 function appendBit(b) {
   const el = document.getElementById('seqInput');
