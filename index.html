@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>马尔可夫 + 凯利公式分析器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #0f0f1a;
+      color: #e0e0f0;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #a78bfa;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #6b6b8a;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      max-width: 860px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      color: #818cf8;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* 输入区 */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #seqInput {
+      flex: 1;
+      min-width: 200px;
+      background: #0f0f1a;
+      border: 1px solid #3a3a5c;
+      border-radius: 8px;
+      color: #e0e0f0;
+      font-size: 1.05rem;
+      letter-spacing: 0.12em;
+      padding: 10px 14px;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.2s;
+    }
+    #seqInput:focus { outline: none; border-color: #818cf8; }
+
+    .btn {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary { background: #7c3aed; color: #fff; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-clear { background: #2a2a4a; color: #a0a0c0; }
+    .btn-clear:hover { background: #333360; }
+
+    .btn-bit {
+      width: 46px; height: 46px;
+      border: none; border-radius: 8px;
+      font-size: 1.2rem; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-zero { background: #1e3a5f; color: #60a5fa; }
+    .btn-zero:hover { background: #2563eb; color: #fff; }
+    .btn-one  { background: #3b1f5e; color: #c084fc; }
+    .btn-one:hover  { background: #7c3aed; color: #fff; }
+    .btn-del  { background: #3b1a1a; color: #f87171; }
+    .btn-del:hover  { background: #dc2626; color: #fff; }
+
+    .bit-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+    /* 序列预览 */
+    #seqPreview {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-top: 10px;
+      word-break: break-all;
+      min-height: 20px;
+    }
+    #seqPreview span.bit-0 { color: #60a5fa; }
+    #seqPreview span.bit-1 { color: #c084fc; }
+
+    /* 参数行 */
+    .params-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .param-group { display: flex; flex-direction: column; gap: 6px; }
+    .param-group label { font-size: 0.8rem; color: #6b6b8a; }
+    .param-group input[type=number] {
+      width: 110px;
+      background: #0f0f1a;
+      border: 1px solid #3a3a5c;
+      border-radius: 8px;
+      color: #e0e0f0;
+      font-size: 0.95rem;
+      padding: 8px 12px;
+    }
+    .param-group input[type=number]:focus { outline: none; border-color: #818cf8; }
+
+    .param-group select {
+      background: #0f0f1a;
+      border: 1px solid #3a3a5c;
+      border-radius: 8px;
+      color: #e0e0f0;
+      font-size: 0.95rem;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    /* 统计区 */
+    .stats-row {
+      display: flex; gap: 14px; flex-wrap: wrap;
+    }
+    .stat-box {
+      flex: 1; min-width: 100px;
+      background: #0f0f1a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      text-align: center;
+    }
+    .stat-box .val { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }
+    .stat-box .lbl { font-size: 0.75rem; color: #6b6b8a; margin-top: 4px; }
+
+    /* 转移矩阵 */
+    .matrix-wrap { overflow-x: auto; }
+    table.matrix {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 480px;
+    }
+    table.matrix th, table.matrix td {
+      border: 1px solid #2a2a4a;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    table.matrix th { background: #12122a; color: #818cf8; }
+    table.matrix td { background: #0f0f1a; }
+    table.matrix td.hi { color: #34d399; font-weight: 700; }
+
+    /* 预测表格 */
+    .predict-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+    }
+    .predict-header .note { font-size: 0.78rem; color: #6b6b8a; }
+
+    table.predict {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.predict thead th {
+      background: #12122a;
+      color: #818cf8;
+      font-size: 0.8rem;
+      padding: 9px 12px;
+      text-align: left;
+      border-bottom: 1px solid #2a2a4a;
+    }
+    table.predict tbody tr { transition: background 0.15s; }
+    table.predict tbody tr:hover { background: #1e1e38; }
+    table.predict tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #1a1a2e;
+      font-size: 0.9rem;
+    }
+
+    .seq-badge {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+    }
+    .seq-badge span.b0 { color: #60a5fa; }
+    .seq-badge span.b1 { color: #c084fc; }
+
+    .bar-wrap { width: 100%; background: #12122a; border-radius: 4px; height: 8px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+
+    .kelly-positive { color: #34d399; font-weight: 700; }
+    .kelly-negative { color: #f87171; font-size: 0.85rem; }
+    .kelly-zero     { color: #94a3b8; font-size: 0.85rem; }
+
+    .rank-1 td:first-child::before { content: '🥇 '; }
+    .rank-2 td:first-child::before { content: '🥈 '; }
+    .rank-3 td:first-child::before { content: '🥉 '; }
+
+    /* 凯利汇总 */
+    .kelly-summary {
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: #0f0f1a;
+      border-radius: 8px;
+      border-left: 3px solid #7c3aed;
+      font-size: 0.88rem;
+      line-height: 1.9;
+      color: #b0b0cc;
+    }
+    .kelly-summary strong { color: #a78bfa; }
+
+    /* 错误提示 */
+    .error-msg {
+      color: #f87171;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #3a3a5c;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 1.2rem; }
+      .card { padding: 14px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔢 马尔可夫 + 凯利公式分析器</h1>
+<p class="subtitle">输入 0/1 序列，预测后续走势概率并计算最优仓位</p>
+
+<!-- 输入卡片 -->
+<div class="card">
+  <h2>① 输入序列</h2>
+  <div class="bit-buttons">
+    <button class="btn-bit btn-zero" onclick="appendBit('0')">0</button>
+    <button class="btn-bit btn-one"  onclick="appendBit('1')">1</button>
+    <button class="btn-bit btn-del"  onclick="deleteBit()">⌫</button>
+  </div>
+  <div class="input-row">
+    <input id="seqInput" type="text"
+      placeholder="直接粘贴或点击上方按钮输入，例如：101100100110..."
+      maxlength="500" oninput="onSeqInput()" />
+    <button class="btn btn-clear" onclick="clearSeq()">清空</button>
+    <button class="btn btn-primary" onclick="analyze()">分析 →</button>
+  </div>
+  <div class="error-msg" id="errMsg"></div>
+  <div id="seqPreview"></div>
+</div>
+
+<!-- 参数卡片 -->
+<div class="card">
+  <h2>② 参数设置</h2>
+  <div class="params-row">
+    <div class="param-group">
+      <label>预测位数</label>
+      <select id="predictLen">
+        <option value="3">后 3 位</option>
+        <option value="4" selected>后 4 位</option>
+        <option value="5">后 5 位</option>
+        <option value="6">后 6 位</option>
+      </select>
+    </div>
+    <div class="param-group">
+      <label>赔率 b（赢时净收益 / 本金）</label>
+      <input type="number" id="oddsB" value="1.0" min="0.01" step="0.1" />
+    </div>
+    <div class="param-group">
+      <label>马尔可夫阶数</label>
+      <select id="markovOrder">
+        <option value="1" selected>一阶（推荐）</option>
+        <option value="2">二阶</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="card" id="statsCard" style="display:none">
+  <h2>③ 序列统计</h2>
+  <div class="stats-row" id="statsRow"></div>
+</div>
+
+<!-- 转移矩阵卡片 -->
+<div class="card" id="matrixCard" style="display:none">
+  <h2>④ 马尔可夫转移矩阵</h2>
+  <div class="matrix-wrap" id="matrixWrap"></div>
+</div>
+
+<!-- 预测卡片 -->
+<div class="card" id="predictCard" style="display:none">
+  <h2>⑤ 后续走势预测与凯利建议</h2>
+  <div class="predict-header">
+    <span id="predictNote" class="note"></span>
+  </div>
+  <div id="predictTable"></div>
+  <div class="kelly-summary" id="kellySummary"></div>
+</div>
+
+<script>
+// ── 工具 ──────────────────────────────────────
+function appendBit(b) {
+  const el = document.getElementById('seqInput');
+  if (el.value.length < 500) { el.value += b; onSeqInput(); }
+}
+function deleteBit() {
+  const el = document.getElementById('seqInput');
+  el.value = el.value.slice(0, -1);
+  onSeqInput();
+}
+function clearSeq() {
+  document.getElementById('seqInput').value = '';
+  onSeqInput();
+  hideResults();
+}
+
+function onSeqInput() {
+  const raw = document.getElementById('seqInput').value;
+  const clean = raw.replace(/[^01]/g, '');
+  if (clean !== raw) document.getElementById('seqInput').value = clean;
+  renderPreview(clean);
+  document.getElementById('errMsg').textContent = '';
+}
+
+function renderPreview(seq) {
+  const el = document.getElementById('seqPreview');
+  if (!seq) { el.innerHTML = ''; return; }
+  const html = seq.split('').map(b => `<span class="bit-${b}">${b}</span>`).join('');
+  el.innerHTML = `长度 <strong>${seq.length}</strong> 位：${html}`;
+}
+
+function hideResults() {
+  ['statsCard','matrixCard','predictCard'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+// ── 一阶马尔可夫 ──────────────────────────────
+function buildMarkov1(seq) {
+  const counts = { '0':{'0':0,'1':0}, '1':{'0':0,'1':0} };
+  for (let i = 0; i < seq.length - 1; i++) counts[seq[i]][seq[i+1]]++;
+  const prob = {};
+  for (const from of ['0','1']) {
+    const total = counts[from]['0'] + counts[from]['1'];
+    prob[from] = {
+      '0': total ? counts[from]['0'] / total : 0.5,
+      '1': total ? counts[from]['1'] / total : 0.5,
+      counts: counts[from], total
+    };
+  }
+  return prob;
+}
+
+// ── 二阶马尔可夫 ──────────────────────────────
+function buildMarkov2(seq) {
+  const states = ['00','01','10','11'];
+  const counts = {};
+  states.forEach(s => { counts[s] = {'0':0,'1':0}; });
+  for (let i = 0; i < seq.length - 2; i++) {
+    const from = seq[i] + seq[i+1];
+    if (counts[from] !== undefined) counts[from][seq[i+2]]++;
+  }
+  const prob = {};
+  states.forEach(s => {
+    const total = counts[s]['0'] + counts[s]['1'];
+    prob[s] = {
+      '0': total ? counts[s]['0'] / total : 0.5,
+      '1': total ? counts[s]['1'] / total : 0.5,
+      counts: counts[s], total
+    };
+  });
+  return prob;
+}
+
+// ── 枚举所有组合概率 ──────────────────────────
+function predictAll(seq, n, order) {
+  const total = Math.pow(2, n);
+  const results = [];
+
+  if (order === 1) {
+    const prob = buildMarkov1(seq);
+    const lastBit = seq[seq.length - 1];
+    for (let mask = 0; mask < total; mask++) {
+      const bits = mask.toString(2).padStart(n, '0');
+      let p = 1, cur = lastBit;
+      for (const b of bits) { p *= prob[cur][b]; cur = b; }
+      results.push({ bits, p });
+    }
+    return { results, prob1: prob, prob2: null };
+  } else {
+    const prob = buildMarkov2(seq);
+    const lastTwo = seq.slice(-2);
+    for (let mask = 0; mask < total; mask++) {
+      const bits = mask.toString(2).padStart(n, '0');
+      let p = 1, cur = lastTwo;
+      for (const b of bits) {
+        p *= (prob[cur] ? prob[cur][b] : 0.5);
+        cur = cur[1] + b;
+      }
+      results.push({ bits, p });
+    }
+    return { results, prob1: null, prob2: prob };
+  }
+}
+
+// ── 凯利公式 ──────────────────────────────────
+function kelly(p, b) {
+  return (b * p - (1 - p)) / b;
+}
+
+// ── 渲染工具 ──────────────────────────────────
+function colorBits(bits) {
+  return bits.split('').map(b => `<span class="b${b}">${b}</span>`).join('');
+}
+
+function countRuns(seq) {
+  let runs = seq.length > 0 ? 1 : 0;
+  for (let i = 1; i < seq.length; i++) if (seq[i] !== seq[i-1]) runs++;
+  return runs;
+}
+
+// ── 渲染统计 ──────────────────────────────────
+function renderStats(seq) {
+  const ones  = (seq.match(/1/g) || []).length;
+  const zeros = seq.length - ones;
+  const runs  = countRuns(seq);
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-box"><div class="val">${seq.length}</div><div class="lbl">总长度</div></div>
+    <div class="stat-box"><div class="val" style="color:#c084fc">${ones}</div>
+      <div class="lbl">1 的数量（${(ones/seq.length*100).toFixed(1)}%）</div></div>
+    <div class="stat-box"><div class="val" style="color:#60a5fa">${zeros}</div>
+      <div class="lbl">0 的数量（${(zeros/seq.length*100).toFixed(1)}%）</div></div>
+    <div class="stat-box"><div class="val" style="color:#34d399">${runs}</div>
+      <div class="lbl">连续段数</div></div>
+  `;
+  document.getElementById('statsCard').style.display = 'block';
+}
+
+// ── 渲染一阶矩阵 ──────────────────────────────
+function renderMatrix1(prob) {
+  const fmt = (v, cnt) =>
+    `<td>${(v*100).toFixed(2)}%&nbsp;<small style="color:#555">(${cnt}次)</small></td>`;
+  document.getElementById('matrixWrap').innerHTML = `
+    <table class="matrix">
+      <thead><tr><th>当前 \\ 下一位</th><th>→ 0</th><th>→ 1</th><th>样本数</th></tr></thead>
+      <tbody>
+        <tr><th>从 <span style="color:#60a5fa">0</span></th>
+          ${fmt(prob['0']['0'], prob['0'].counts['0'])}
+          ${fmt(prob['0']['1'], prob['0'].counts['1'])}
+          <td>${prob['0'].total}</td></tr>
+        <tr><th>从 <span style="color:#c084fc">1</span></th>
+          ${fmt(prob['1']['0'], prob['1'].counts['0'])}
+          ${fmt(prob['1']['1'], prob['1'].counts['1'])}
+          <td>${prob['1'].total}</td></tr>
+      </tbody>
+    </table>`;
+  document.getElementById('matrixCard').style.display = 'block';
+}
+
+// ── 渲染二阶矩阵 ──────────────────────────────
+function renderMatrix2(prob) {
+  const states = ['00','01','10','11'];
+  const rows = states.map(s => {
+    const d = prob[s];
+    return `<tr><th><span class="seq-badge">${colorBits(s)}</span></th>
+      <td>${(d['0']*100).toFixed(2)}%&nbsp;<small style="color:#555">(${d.counts['0']}次)</small></td>
+      <td>${(d['1']*100).toFixed(2)}%&nbsp;<small style="color:#555">(${d.counts['1']}次)</small></td>
+      <td>${d.total}</td></tr>`;
+  }).join('');
+  document.getElementById('matrixWrap').innerHTML = `
+    <table class="matrix">
+      <thead><tr><th>前两位 \\ 下一位</th><th>→ 0</th><th>→ 1</th><th>样本数</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  document.getElementById('matrixCard').style.display = 'block';
+}
+
+// ── 渲染预测表格 ──────────────────────────────
+function renderPredictions(sorted, n, b, seq, order) {
+  const lastLabel = order === 1
+    ? `最后 1 位：<span class="seq-badge">${colorBits(seq.slice(-1))}</span>`
+    : `最后 2 位：<span class="seq-badge">${colorBits(seq.slice(-2))}</span>`;
+  document.getElementById('predictNote').innerHTML =
+    `${lastLabel}　共 ${Math.pow(2,n)} 种组合　赔率 b = <strong>${b}</strong>`;
+
+  const maxP = sorted[0].p;
+  const rows = sorted.map((item, idx) => {
+    const rankClass = idx < 3 ? `rank-${idx+1}` : '';
+    const pct = (item.p * 100).toFixed(4);
+    const barW = maxP > 0 ? (item.p / maxP * 100).toFixed(1) : 0;
+    const barColor = ['#a78bfa','#818cf8','#6366f1'][idx] || '#2a2a4a';
+    const kf = kelly(item.p, b);
+    const kellyHtml = kf > 0.001
+      ? `<span class="kelly-positive">✅ ${(kf*100).toFixed(2)}%</span>`
+      : kf < -0.001
+        ? `<span class="kelly-negative">❌ 不建议</span>`
+        : `<span class="kelly-zero">— 边界</span>`;
+    return `
+      <tr class="${rankClass}">
+        <td><span class="seq-badge">${colorBits(item.bits)}</span></td>
+        <td>${pct}%</td>
+        <td style="width:200px">
+          <div class="bar-wrap">
+            <div class="bar-fill" style="width:${barW}%;background:${barColor}"></div>
+          </div>
+        </td>
+        <td>${kellyHtml}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('predictTable').innerHTML = `
+    <table class="predict">
+      <thead><tr>
+        <th>组合序列</th>
+        <th>出现概率</th>
+        <th>相对概率条</th>
+        <th>凯利仓位建议</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  // 凯利汇总
+  const best = sorted[0];
+  const bestK = kelly(best.p, b);
+  const ones = (seq.match(/1/g)||[]).length;
+  const pOne = ones / seq.length;
+  const kOne = kelly(pOne, b);
+
+  let summary = `<strong>📊 综合建议</strong><br>
+最高概率组合：<span class="seq-badge">${colorBits(best.bits)}</span>（${(best.p*100).toFixed(4)}%）<br>
+对应凯利仓位：`;
+
+  if (bestK > 0.001) {
+    summary += `<span class="kelly-positive">建议投入本金的 ${(bestK*100).toFixed(2)}%</span><br>`;
+  } else {
+    summary += `<span class="kelly-negative">无统计优势，凯利公式建议不参与（f* = ${(bestK*100).toFixed(2)}%）</span><br>`;
+  }
+
+  summary += `<br>历史中 <span class="seq-badge"><span class="b1">1</span></span> 出现频率：${(pOne*100).toFixed(2)}%，下注"下一个为1"的凯利值：`;
+  summary += kOne > 0.001
+    ? `<span class="kelly-positive">${(kOne*100).toFixed(2)}%</span>`
+    : `<span class="kelly-negative">${(kOne*100).toFixed(2)}%（不建议）</span>`;
+
+  summary += `<br><br><small style="color:#4a4a6a">⚠️ 凯利公式基于统计估计，样本越多（建议 ≥ 200 位）结果越可靠。此工具仅供研究学习使用。</small>`;
+
+  document.getElementById('kellySummary').innerHTML = summary;
+  document.getElementById('predictCard').style.display = 'block';
+}
+
+// ── 主入口 ────────────────────────────────────
+function analyze() {
+  const seq = document.getElementById('seqInput').value.replace(/[^01]/g,'');
+  const errEl = document.getElementById('errMsg');
+  const order = parseInt(document.getElementById('markovOrder').value);
+  const minLen = order === 1 ? 3 : 5;
+
+  if (seq.length < minLen) {
+    errEl.textContent = `序列至少需要 ${minLen} 位才能分析（当前 ${seq.length} 位）`;
+    hideResults();
+    return;
+  }
+  const n = parseInt(document.getElementById('predictLen').value);
+  const b = parseFloat(document.getElementById('oddsB').value);
+  if (isNaN(b) || b <= 0) { errEl.textContent = '赔率 b 必须大于 0'; return; }
+
+  errEl.textContent = '';
+  renderStats(seq);
+
+  const { results, prob1, prob2 } = predictAll(seq, n, order);
+  if (order === 1 && prob1) renderMatrix1(prob1);
+  if (order === 2 && prob2) renderMatrix2(prob2);
+
+  const sorted = [...results].sort((a, b) => b.p - a.p);
+  renderPredictions(sorted, n, b, seq, order);
+}
+
+// ── 初始化 ────────────────────────────────────
+window.onload = () => {
+  document.getElementById('seqInput').value = '101100100110000111011100001011010010000011001';
+  onSeqInput();
+};
+</script>
+</body>
+</html>
