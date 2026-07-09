@@ -12,42 +12,34 @@
       background: #0f0f1a;
       color: #e0e0f0;
       min-height: 100vh;
-      padding: 24px 16px;
+      padding: 12px 12px;
     }
 
     h1 {
       text-align: center;
-      font-size: 1.6rem;
+      font-size: 1.2rem;
       font-weight: 700;
       color: #a78bfa;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
       letter-spacing: 0.05em;
-    }
-
-    .subtitle {
-      text-align: center;
-      font-size: 0.85rem;
-      color: #6b6b8a;
-      margin-bottom: 28px;
     }
 
     .card {
       background: #1a1a2e;
       border: 1px solid #2a2a4a;
       border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 20px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
       max-width: 860px;
       margin-left: auto;
       margin-right: auto;
     }
 
     .card h2 {
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       color: #818cf8;
-      margin-bottom: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
     }
 
     /* 输入区 */
@@ -192,14 +184,14 @@
       background: #12122a;
       color: #818cf8;
       font-size: 0.8rem;
-      padding: 9px 12px;
+      padding: 7px 10px;
       text-align: left;
       border-bottom: 1px solid #2a2a4a;
     }
     table.predict tbody tr { transition: background 0.15s; }
     table.predict tbody tr:hover { background: #1e1e38; }
     table.predict tbody td {
-      padding: 8px 12px;
+      padding: 6px 10px;
       border-bottom: 1px solid #1a1a2e;
       font-size: 0.9rem;
     }
@@ -226,13 +218,13 @@
 
     /* 凯利汇总 */
     .kelly-summary {
-      margin-top: 16px;
-      padding: 14px 18px;
+      margin-top: 10px;
+      padding: 10px 14px;
       background: #0f0f1a;
       border-radius: 8px;
       border-left: 3px solid #7c3aed;
-      font-size: 0.88rem;
-      line-height: 1.9;
+      font-size: 0.83rem;
+      line-height: 1.7;
       color: #b0b0cc;
     }
     .kelly-summary strong { color: #a78bfa; }
@@ -267,11 +259,9 @@
 <body>
 
 <h1>🔢 马尔可夫 + 凯利公式分析器</h1>
-<p class="subtitle">输入 0/1 序列，预测后续走势概率并计算最优仓位</p>
 
 <!-- 输入卡片 -->
 <div class="card">
-  <h2>① 输入序列</h2>
   <div class="bit-buttons">
     <button class="btn-bit btn-zero" onclick="appendBit('0')">0</button>
     <button class="btn-bit btn-one"  onclick="appendBit('1')">1</button>
@@ -279,7 +269,7 @@
   </div>
   <div class="input-row">
     <input id="seqInput" type="text"
-      placeholder="直接粘贴或点击上方按钮输入，例如：101100100110..."
+      placeholder="粘贴或点击按钮输入 0/1 序列..."
       maxlength="500" oninput="onSeqInput()" />
     <button class="btn btn-clear" onclick="clearSeq()">清空</button>
     <button class="btn btn-primary" onclick="analyze()">分析 →</button>
@@ -288,56 +278,54 @@
   <div id="seqPreview"></div>
 </div>
 
-<!-- 参数卡片 -->
-<div class="card">
-  <h2>② 参数设置</h2>
-  <div class="params-row">
-    <div class="param-group">
-      <label>预测位数</label>
-      <select id="predictLen">
-        <option value="3">后 3 位</option>
-        <option value="4" selected>后 4 位</option>
-        <option value="5">后 5 位</option>
-        <option value="6">后 6 位</option>
-      </select>
-    </div>
-    <div class="param-group">
-      <label>赔率 b（赢时净收益 / 本金）</label>
-      <input type="number" id="oddsB" value="1.0" min="0.01" step="0.1" />
-    </div>
-    <div class="param-group">
-      <label>马尔可夫阶数</label>
-      <select id="markovOrder">
-        <option value="1" selected>一阶（推荐）</option>
-        <option value="2">二阶</option>
-      </select>
-    </div>
-  </div>
-</div>
-
-<!-- 预测卡片 -->
+<!-- 预测结果卡片 -->
 <div class="card" id="predictCard" style="display:none">
-  <h2>📊 预测结果</h2>
-  <div class="predict-header">
-    <span id="predictNote" class="note"></span>
-  </div>
   <div id="predictTable"></div>
   <div class="kelly-summary" id="kellySummary"></div>
 </div>
 
 <!-- 统计卡片（折叠） -->
 <div class="card" id="statsCard" style="display:none">
-  <h2 class="collapsible" onclick="toggleCard('statsBody')">③ 序列统计 <span class="toggle-icon">▼</span></h2>
-  <div id="statsBody">
+  <h2 class="collapsible" onclick="toggleCard('statsBody')">序列统计 <span class="toggle-icon">▶</span></h2>
+  <div id="statsBody" style="display:none">
     <div class="stats-row" id="statsRow"></div>
   </div>
 </div>
 
 <!-- 转移矩阵卡片（折叠） -->
 <div class="card" id="matrixCard" style="display:none">
-  <h2 class="collapsible" onclick="toggleCard('matrixBody')">④ 马尔可夫转移矩阵 <span class="toggle-icon">▼</span></h2>
-  <div id="matrixBody">
+  <h2 class="collapsible" onclick="toggleCard('matrixBody')">马尔可夫转移矩阵 <span class="toggle-icon">▶</span></h2>
+  <div id="matrixBody" style="display:none">
     <div class="matrix-wrap" id="matrixWrap"></div>
+  </div>
+</div>
+
+<!-- 参数设置卡片（折叠） -->
+<div class="card" id="paramsCard">
+  <h2 class="collapsible" onclick="toggleCard('paramsBody')">参数设置 <span class="toggle-icon">▶</span></h2>
+  <div id="paramsBody" style="display:none">
+    <div class="params-row" style="margin-top:12px">
+      <div class="param-group">
+        <label>预测位数</label>
+        <select id="predictLen">
+          <option value="3">后 3 位</option>
+          <option value="4" selected>后 4 位</option>
+          <option value="5">后 5 位</option>
+          <option value="6">后 6 位</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>赔率 b（赢时净收益 / 本金）</label>
+        <input type="number" id="oddsB" value="1.0" min="0.01" step="0.1" />
+      </div>
+      <div class="param-group">
+        <label>马尔可夫阶数</label>
+        <select id="markovOrder">
+          <option value="1" selected>一阶（推荐）</option>
+          <option value="2">二阶</option>
+        </select>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -533,8 +521,8 @@ function renderPredictions(sorted, n, b, seq, order) {
   const lastLabel = order === 1
     ? `最后 1 位：<span class="seq-badge">${colorBits(seq.slice(-1))}</span>`
     : `最后 2 位：<span class="seq-badge">${colorBits(seq.slice(-2))}</span>`;
-  document.getElementById('predictNote').innerHTML =
-    `${lastLabel}　共 ${Math.pow(2,n)} 种组合　赔率 b = <strong>${b}</strong>`;
+  document.getElementById('predictNote') && (document.getElementById('predictNote').innerHTML =
+    `${lastLabel}　共 ${Math.pow(2,n)} 种组合　赔率 b = <strong>${b}</strong>`);
 
   const maxP = sorted[0].p;
   const rows = sorted.map((item, idx) => {
