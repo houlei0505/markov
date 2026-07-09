@@ -520,7 +520,7 @@ function renderPredictions(sorted, n, b, seq, order) {
 
   const maxP = sorted[0].p;
   const rows = sorted.map((item, idx) => {
-    const rankClass = idx < 3 ? `rank-${idx+1}` : '';
+    const rankClass = `rank-${idx+1}`;
     const pct = (item.p * 100).toFixed(4);
     const barW = maxP > 0 ? (item.p / maxP * 100).toFixed(1) : 0;
     const barColor = ['#a78bfa','#818cf8','#6366f1'][idx] || '#2a2a4a';
@@ -605,7 +605,7 @@ function analyze() {
   if (order === 1 && prob1) renderMatrix1(prob1);
   if (order === 2 && prob2) renderMatrix2(prob2);
 
-  const sorted = [...results].sort((a, b) => b.p - a.p);
+  const sorted = [...results].sort((a, b) => b.p - a.p).slice(0, 3);
   renderPredictions(sorted, n, b, seq, order);
 }
 
