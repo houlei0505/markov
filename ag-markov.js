@@ -16,7 +16,7 @@
   var pollTimer = null;
   var panelCreated = false;
 
-  // ── 马尔科夫核心算法 ──────────────────────────
+  // ── 一阶马尔科夫 ──────────────────────────────
   function buildMarkov1(seq) {
     var counts = { '0': { '0': 0, '1': 0 }, '1': { '0': 0, '1': 0 } };
     for (var i = 0; i < seq.length - 1; i++) {
@@ -35,7 +35,7 @@
     return prob;
   }
 
-  function predictTop1(seq) {
+  function predictTop1Order1(seq) {
     if (seq.length < 3) return null;
     var prob = buildMarkov1(seq);
     var lastBit = seq[seq.length - 1];
@@ -51,6 +51,55 @@
       for (var j = 0; j < bits.length; j++) {
         p *= prob[cur][bits[j]];
         cur = bits[j];
+      }
+      if (p > bestP) {
+        bestP = p;
+        bestBits = bits;
+      }
+    }
+    return { bits: bestBits, p: bestP };
+  }
+
+  // ── 二阶马尔科夫 ──────────────────────────────
+  function buildMarkov2(seq) {
+    var states = ['00', '01', '10', '11'];
+    var counts = {};
+    for (var si = 0; si < states.length; si++) {
+      counts[states[si]] = { '0': 0, '1': 0 };
+    }
+    for (var i = 0; i < seq.length - 2; i++) {
+      var from = seq[i] + seq[i + 1];
+      if (counts[from]) counts[from][seq[i + 2]]++;
+    }
+    var prob = {};
+    for (var si2 = 0; si2 < states.length; si2++) {
+      var s = states[si2];
+      var total = counts[s]['0'] + counts[s]['1'];
+      prob[s] = {
+        '0': total ? counts[s]['0'] / total : 0.5,
+        '1': total ? counts[s]['1'] / total : 0.5
+      };
+    }
+    return prob;
+  }
+
+  function predictTop1Order2(seq) {
+    if (seq.length < 5) return null;
+    var prob = buildMarkov2(seq);
+    var lastTwo = seq[seq.length - 2] + seq[seq.length - 1];
+    var n = PREDICT_LEN;
+    var total = Math.pow(2, n);
+    var bestBits = '';
+    var bestP = -1;
+
+    for (var mask = 0; mask < total; mask++) {
+      var bits = mask.toString(2).padStart(n, '0');
+      var p = 1;
+      var cur = lastTwo;
+      for (var j = 0; j < bits.length; j++) {
+        var prob_val = (prob[cur] ? prob[cur][bits[j]] : 0.5);
+        p *= prob_val;
+        cur = cur[1] + bits[j];
       }
       if (p > bestP) {
         bestP = p;
@@ -111,7 +160,7 @@
         '<div id="mk-results"></div>' +
       '</div>';
 
-    panel.style.cssText = 'position:fixed;top:10px;left:10px;z-index:2147483647;background:rgba(15,15,26,0.95);border:2px solid #7c3aed;border-radius:10px;font-family:"Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;color:#e0e0f0;min-width:220px;box-shadow:0 4px 20px rgba(124,58,237,0.4);pointer-events:auto;display:block;visibility:visible;opacity:1;';
+    panel.style.cssText = 'position:fixed;top:10px;left:10px;z-index:2147483647;background:rgba(15,15,26,0.95);border:2px solid #7c3aed;border-radius:10px;font-family:"Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;color:#e0e0f0;min-width:260px;box-shadow:0 4px 20px rgba(124,58,237,0.4);pointer-events:auto;display:block;visibility:visible;opacity:1;';
 
     document.body.appendChild(panel);
     panelCreated = true;
@@ -185,22 +234,47 @@
     var html = '';
     for (var i = 0; i < roads.length; i++) {
       var road = roads[i];
-      var top1 = predictTop1(road.seq);
-      if (top1) {
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">' +
-          '<span style="font-size:11px;color:#818cf8;font-weight:600;">' + road.name + '</span>' +
-          '<span>' +
-            '<span style="font-family:Courier New,monospace;font-size:13px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1.bits) + '</span>' +
-            '<span style="font-size:10px;margin-left:4px;">' + colorLabel(top1.bits, road.type) + '</span>' +
-            '<span style="font-size:11px;color:#34d399;margin-left:6px;">' + (top1.p * 100).toFixed(2) + '%</span>' +
-          '</span>' +
-        '</div>';
-      } else {
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">' +
-          '<span style="font-size:11px;color:#818cf8;font-weight:600;">' + road.name + '</span>' +
-          '<span style="font-size:11px;color:#6b6b8a;">\u6570\u636E\u4E0D\u8DB3</span>' +
-        '</div>';
+      var top1_o1 = predictTop1Order1(road.seq);
+      var top1_o2 = predictTop1Order2(road.seq);
+
+      // 判断一致性
+      var consensus = '';
+      if (top1_o1 && top1_o2 && top1_o1.bits === top1_o2.bits) {
+        consensus = '<span style="font-size:9px;color:#34d399;margin-left:4px;">\u2705</span>';
       }
+
+      html += '<div style="padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
+      html += '<span style="font-size:11px;color:#818cf8;font-weight:600;">' + road.name + consensus + '</span>';
+      html += '</div>';
+
+      // 一阶
+      if (top1_o1) {
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
+        html += '<span style="font-size:10px;color:#6b6b8a;">1\u9636</span>';
+        html += '<span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o1.bits) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o1.bits, road.type) + '</span>';
+        html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o1.p * 100).toFixed(2) + '%</span>';
+        html += '</span></div>';
+      } else {
+        html += '<div style="padding-left:8px;font-size:10px;color:#6b6b8a;">1\u9636 \u6570\u636E\u4E0D\u8DB3</div>';
+      }
+
+      // 二阶
+      if (top1_o2) {
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
+        html += '<span style="font-size:10px;color:#6b6b8a;">2\u9636</span>';
+        html += '<span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o2.bits) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o2.bits, road.type) + '</span>';
+        html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o2.p * 100).toFixed(2) + '%</span>';
+        html += '</span></div>';
+      } else {
+        html += '<div style="padding-left:8px;font-size:10px;color:#6b6b8a;">2\u9636 \u6570\u636E\u4E0D\u8DB3</div>';
+      }
+
+      html += '</div>';
     }
     resultsEl.innerHTML = html;
   }
