@@ -200,35 +200,37 @@
   }
 
   // 派生路红蓝转庄闲：链式推导
-  // 红(0)=跟上一局, 蓝(1)=反转上一局
-  // daLuLastBit: 大路最后一局的结果 '0'=庄 '1'=闲
+  // 派生路中 0=红=延续（跟前一个大路结果一样）, 1=蓝=打破（跟前一个相反）
   function derivedToZhuangXian(bits, daLuLastBit) {
     var result = '';
-    var cur = daLuLastBit; // 当前大路末位
+    var cur = daLuLastBit;
     for (var i = 0; i < bits.length; i++) {
       if (bits[i] === '0') {
-        // 红=跟，下一局跟当前一样
+        // 红=延续
         result += cur;
       } else {
-        // 蓝=变，下一局反转
+        // 蓝=打破
         result += (cur === '0' ? '1' : '0');
       }
-      // 更新当前大路末位为这次推导出的结果
       cur = result[i];
     }
     return result;
   }
 
-  function colorLabel(bits, type, daLuLastBit) {
-    var displayBits = bits;
-    // 派生路：先转成庄闲
-    if (type === 'other' && daLuLastBit !== undefined) {
-      displayBits = derivedToZhuangXian(bits, daLuLastBit);
-    }
-    return '(' + displayBits.split('').map(function(b) {
+  // 显示庄闲文字标签
+  function zhuangXianLabel(zxBits) {
+    return '(' + zxBits.split('').map(function(b) {
       if (b === '0') return '<span style="color:#ff4d4f">\u5E84</span>';
       return '<span style="color:#4da6ff">\u95F2</span>';
     }).join('') + ')';
+  }
+
+  // 显示庄闲序列数字（0=庄红色，1=闲蓝色）
+  function colorZXBits(zxBits) {
+    return zxBits.split('').map(function(b) {
+      var color = b === '0' ? '#ff4d4f' : '#4da6ff';
+      return '<span style="color:' + color + '">' + b + '</span>';
+    }).join('');
   }
 
   function updatePanel(data) {
@@ -260,14 +262,19 @@
       var top1_o1 = predictTop1Order1(road.seq);
       var top1_o2 = predictTop1Order2(road.seq);
 
-      // 判断一致性（派生路转换后再比较）
+      // 对派生路，把预测结果转成庄闲
+      var o1ZX = null, o2ZX = null;
+      if (top1_o1) {
+        o1ZX = road.type === 'other' ? derivedToZhuangXian(top1_o1.bits, daLuLastBit) : top1_o1.bits;
+      }
+      if (top1_o2) {
+        o2ZX = road.type === 'other' ? derivedToZhuangXian(top1_o2.bits, daLuLastBit) : top1_o2.bits;
+      }
+
+      // 判断一致性（基于转换后的庄闲结果）
       var consensus = '';
-      if (top1_o1 && top1_o2) {
-        var cmp1 = road.type === 'other' ? derivedToZhuangXian(top1_o1.bits, daLuLastBit) : top1_o1.bits;
-        var cmp2 = road.type === 'other' ? derivedToZhuangXian(top1_o2.bits, daLuLastBit) : top1_o2.bits;
-        if (cmp1 === cmp2) {
-          consensus = '<span style="font-size:9px;color:#34d399;margin-left:4px;">\u2705</span>';
-        }
+      if (o1ZX && o2ZX && o1ZX === o2ZX) {
+        consensus = '<span style="font-size:9px;color:#34d399;margin-left:4px;">\u2705</span>';
       }
 
       html += '<div style="padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">';
@@ -277,11 +284,12 @@
 
       // 一阶
       if (top1_o1) {
+        var display1 = o1ZX;
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
         html += '<span style="font-size:10px;color:#6b6b8a;">1\u9636</span>';
         html += '<span>';
-        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o1.bits) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o1.bits, road.type, daLuLastBit) + '</span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZXBits(display1) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + zhuangXianLabel(display1) + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o1.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
@@ -290,11 +298,12 @@
 
       // 二阶
       if (top1_o2) {
+        var display2 = o2ZX;
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
         html += '<span style="font-size:10px;color:#6b6b8a;">2\u9636</span>';
         html += '<span>';
-        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o2.bits) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o2.bits, road.type, daLuLastBit) + '</span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZXBits(display2) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + zhuangXianLabel(display2) + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o2.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
