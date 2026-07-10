@@ -199,15 +199,35 @@
     }).join('');
   }
 
-  function colorLabel(bits, type) {
-    return '(' + bits.split('').map(function(b) {
-      if (type === 'daLu') {
-        if (b === '0') return '<span style="color:#ff4d4f">\u5E84</span>';
-        return '<span style="color:#4da6ff">\u95F2</span>';
+  // 派生路红蓝转庄闲：链式推导
+  // 红(0)=跟上一局, 蓝(1)=反转上一局
+  // daLuLastBit: 大路最后一局的结果 '0'=庄 '1'=闲
+  function derivedToZhuangXian(bits, daLuLastBit) {
+    var result = '';
+    var cur = daLuLastBit; // 当前大路末位
+    for (var i = 0; i < bits.length; i++) {
+      if (bits[i] === '0') {
+        // 红=跟，下一局跟当前一样
+        result += cur;
       } else {
-        if (b === '0') return '<span style="color:#ff4d4f">\u7EA2</span>';
-        return '<span style="color:#4da6ff">\u84DD</span>';
+        // 蓝=变，下一局反转
+        result += (cur === '0' ? '1' : '0');
       }
+      // 更新当前大路末位为这次推导出的结果
+      cur = result[i];
+    }
+    return result;
+  }
+
+  function colorLabel(bits, type, daLuLastBit) {
+    var displayBits = bits;
+    // 派生路：先转成庄闲
+    if (type === 'other' && daLuLastBit !== undefined) {
+      displayBits = derivedToZhuangXian(bits, daLuLastBit);
+    }
+    return '(' + displayBits.split('').map(function(b) {
+      if (b === '0') return '<span style="color:#ff4d4f">\u5E84</span>';
+      return '<span style="color:#4da6ff">\u95F2</span>';
     }).join('') + ')';
   }
 
@@ -231,16 +251,23 @@
       { name: '\u5C0F\u5F3A', seq: data.xiaoQiang, type: 'other' }
     ];
 
+    // 大路最后一局结果，用于派生路转庄闲
+    var daLuLastBit = data.daLu.length > 0 ? data.daLu[data.daLu.length - 1] : '0';
+
     var html = '';
     for (var i = 0; i < roads.length; i++) {
       var road = roads[i];
       var top1_o1 = predictTop1Order1(road.seq);
       var top1_o2 = predictTop1Order2(road.seq);
 
-      // 判断一致性
+      // 判断一致性（派生路转换后再比较）
       var consensus = '';
-      if (top1_o1 && top1_o2 && top1_o1.bits === top1_o2.bits) {
-        consensus = '<span style="font-size:9px;color:#34d399;margin-left:4px;">\u2705</span>';
+      if (top1_o1 && top1_o2) {
+        var cmp1 = road.type === 'other' ? derivedToZhuangXian(top1_o1.bits, daLuLastBit) : top1_o1.bits;
+        var cmp2 = road.type === 'other' ? derivedToZhuangXian(top1_o2.bits, daLuLastBit) : top1_o2.bits;
+        if (cmp1 === cmp2) {
+          consensus = '<span style="font-size:9px;color:#34d399;margin-left:4px;">\u2705</span>';
+        }
       }
 
       html += '<div style="padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">';
@@ -254,7 +281,7 @@
         html += '<span style="font-size:10px;color:#6b6b8a;">1\u9636</span>';
         html += '<span>';
         html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o1.bits) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o1.bits, road.type) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o1.bits, road.type, daLuLastBit) + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o1.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
@@ -267,7 +294,7 @@
         html += '<span style="font-size:10px;color:#6b6b8a;">2\u9636</span>';
         html += '<span>';
         html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorBits(top1_o2.bits) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o2.bits, road.type) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + colorLabel(top1_o2.bits, road.type, daLuLastBit) + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o2.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
