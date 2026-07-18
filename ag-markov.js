@@ -1,83 +1,127 @@
-// AG 马尔科夫路单分析 - 远程逻辑脚本
-// 部署到 GitHub Pages，由油猴 loader 动态加载
-// 更新此文件并推送即可生效，无需重装油猴脚本
+  // AG 马尔科夫路单分析 - 远程逻辑脚本
+  // 部署到 GitHub Pages，由油猴 loader 动态加载
+  // 更新此文件并推送即可生效，无需重装油猴脚本
 
-(function() {
-  'use strict';
+  (function() {
+    'use strict';
 
-  if (window.__MK_LOADED__) return;
-  window.__MK_LOADED__ = true;
+    if (window.__MK_LOADED__) return;
+    window.__MK_LOADED__ = true;
 
-  // ── 配置 ──────────────────────────────────────
-  var PREDICT_LEN = 4;
-  var POLL_INTERVAL = 3000;
-  var pollTimer = null;
-  var panelCreated = false;
+    // ── 配置 ──────────────────────────────────────
+    var PREDICT_LEN = 4;
+    var POLL_INTERVAL = 3000;
+    var pollTimer = null;
+    var panelCreated = false;
 
-  // ── 一阶马尔科夫 ──────────────────────────────
-  function buildMarkov1(seq) {
-    var counts = { '0': { '0': 0, '1': 0 }, '1': { '0': 0, '1': 0 } };
-    for (var i = 0; i < seq.length - 1; i++) {
-      counts[seq[i]][seq[i + 1]]++;
+    // ── 每日计算额度 ──────────────────────────────
+    var DAILY_LIMIT = 100;
+    var STORAGE_KEY_COUNT = 'mk_daily_count';
+    var STORAGE_KEY_DATE  = 'mk_daily_date';
+
+    function getTodayStr() {
+      var d = new Date();
+      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
     }
-    var prob = {};
-    var states = ['0', '1'];
-    for (var si = 0; si < states.length; si++) {
-      var from = states[si];
-      var total = counts[from]['0'] + counts[from]['1'];
-      prob[from] = {
-        '0': total ? counts[from]['0'] / total : 0.5,
-        '1': total ? counts[from]['1'] / total : 0.5
-      };
-    }
-    return prob;
-  }
 
-  function predictTop1Order1(seq) {
-    if (seq.length < 3) return null;
-    var prob = buildMarkov1(seq);
-    var lastBit = seq[seq.length - 1];
-    var n = PREDICT_LEN;
-    var total = Math.pow(2, n);
-    var bestBits = '';
-    var bestP = -1;
-    for (var mask = 0; mask < total; mask++) {
-      var bits = mask.toString(2).padStart(n, '0');
-      var p = 1;
-      var cur = lastBit;
-      for (var j = 0; j < bits.length; j++) {
-        p *= prob[cur][bits[j]];
-        cur = bits[j];
+    function getDailyUsed() {
+      var today = getTodayStr();
+      var savedDate = localStorage.getItem(STORAGE_KEY_DATE);
+      if (savedDate !== today) {
+        // 新的一天，重置计数
+        localStorage.setItem(STORAGE_KEY_DATE, today);
+        localStorage.setItem(STORAGE_KEY_COUNT, '0');
+        return 0;
       }
-      if (p > bestP) { bestP = p; bestBits = bits; }
+      return parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
     }
-    return { bits: bestBits, p: bestP };
-  }
 
-  // ── 二阶马尔科夫 ──────────────────────────────
-  function buildMarkov2(seq) {
-    var states = ['00', '01', '10', '11'];
-    var counts = {};
-    for (var si = 0; si < states.length; si++) counts[states[si]] = { '0': 0, '1': 0 };
-    for (var i = 0; i < seq.length - 2; i++) {
-      var from = seq[i] + seq[i + 1];
-      if (counts[from]) counts[from][seq[i + 2]]++;
+    function addDailyUsed() {
+      var today = getTodayStr();
+      localStorage.setItem(STORAGE_KEY_DATE, today);
+      var cur = getDailyUsed();
+      var next = cur + 1;
+      localStorage.setItem(STORAGE_KEY_COUNT, String(next));
+      return next;
     }
-    var prob = {};
-    for (var si2 = 0; si2 < states.length; si2++) {
-      var s = states[si2];
-      var total = counts[s]['0'] + counts[s]['1'];
-      prob[s] = {
-        '0': total ? counts[s]['0'] / total : 0.5,
-        '1': total ? counts[s]['1'] / total : 0.5
-      };
-    }
-    return prob;
-  }
 
-  function predictTop1Order2(seq) {
-    if (seq.length < 5) return null;
-    var prob = buildMarkov2(seq);
+    // 每次进入房间调用一次，返回当前已用次数（含本次）
+    function onEnterRoom() {
+      return addDailyUsed();
+    }
+
+    function isLimitReached() {
+      return getDailyUsed() >= DAILY_LIMIT;
+    }
+
+    function getRemaining() {
+      return Math.max(0, DAILY_LIMIT - getDailyUsed());
+    }
+
+    // ── 一阶马尔科夫 ──────────────────────────────
+    function buildMarkov1(seq) {
+      var counts = { '0': { '0': 0, '1': 0 }, '1': { '0': 0, '1': 0 } };
+      for (var i = 0; i < seq.length - 1; i++) {
+        counts[seq[i]][seq[i + 1]]++;
+      }
+      var prob = {};
+      var states = ['0', '1'];
+      for (var si = 0; si < states.length; si++) {
+        var from = states[si];
+        var total = counts[from]['0'] + counts[from]['1'];
+        prob[from] = {
+          '0': total ? counts[from]['0'] / total : 0.5,
+          '1': total ? counts[from]['1'] / total : 0.5
+        };
+      }
+      return prob;
+    }
+
+    function predictTop1Order1(seq) {
+      if (seq.length < 3) return null;
+      var prob = buildMarkov1(seq);
+      var lastBit = seq[seq.length - 1];
+      var n = PREDICT_LEN;
+      var total = Math.pow(2, n);
+      var bestBits = '';
+      var bestP = -1;
+      for (var mask = 0; mask < total; mask++) {
+        var bits = mask.toString(2).padStart(n, '0');
+        var p = 1;
+        var cur = lastBit;
+        for (var j = 0; j < bits.length; j++) {
+          p *= prob[cur][bits[j]];
+          cur = bits[j];
+        }
+        if (p > bestP) { bestP = p; bestBits = bits; }
+      }
+      return { bits: bestBits, p: bestP };
+    }
+
+    // ── 二阶马尔科夫 ──────────────────────────────
+    function buildMarkov2(seq) {
+      var states = ['00', '01', '10', '11'];
+      var counts = {};
+      for (var si = 0; si < states.length; si++) counts[states[si]] = { '0': 0, '1': 0 };
+      for (var i = 0; i < seq.length - 2; i++) {
+        var from = seq[i] + seq[i + 1];
+        if (counts[from]) counts[from][seq[i + 2]]++;
+      }
+      var prob = {};
+      for (var si2 = 0; si2 < states.length; si2++) {
+        var s = states[si2];
+        var total = counts[s]['0'] + counts[s]['1'];
+        prob[s] = {
+          '0': total ? counts[s]['0'] / total : 0.5,
+          '1': total ? counts[s]['1'] / total : 0.5
+        };
+      }
+      return prob;
+    }
+
+    function predictTop1Order2(seq) {
+      if (seq.length < 5) return null;
+      var prob = buildMarkov2(seq);
     var lastTwo = seq[seq.length - 2] + seq[seq.length - 1];
     var n = PREDICT_LEN;
     var total = Math.pow(2, n);
@@ -294,11 +338,12 @@
     panel.id = 'mk-float-panel';
     panel.innerHTML =
       '<div id="mk-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(124,58,237,0.2);border-radius:10px 10px 0 0;font-weight:600;font-size:12px;cursor:move;">' +
-        '<span>\u{1F52E} \u9A6C\u5C14\u79D1\u592B\u9884\u6D4B</span>' +
-        '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">\u2014</span>' +
+        '<span>🔮 马尔科夫预测</span>' +
+        '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
       '</div>' +
+      '<div id="mk-quota" style="padding:4px 12px;background:rgba(124,58,237,0.08);border-bottom:1px solid rgba(124,58,237,0.2);font-size:11px;color:#94a3b8;text-align:right;">今日剩余 <span style="color:#34d399;font-weight:700;">100</span> 次</div>' +
       '<div id="mk-body" style="padding:10px 12px;">' +
-        '<div id="mk-status" style="font-size:11px;color:#94a3b8;margin-bottom:8px;">\u7B49\u5F85\u8FDB\u5165\u623F\u95F4...</div>' +
+        '<div id="mk-status" style="font-size:11px;color:#94a3b8;margin-bottom:8px;">等待进入房间...</div>' +
         '<div id="mk-results"></div>' +
       '</div>';
     panel.style.cssText = 'position:fixed;top:10px;left:10px;z-index:2147483647;background:rgba(15,15,26,0.95);border:2px solid #7c3aed;border-radius:10px;font-family:"Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;color:#e0e0f0;min-width:260px;box-shadow:0 4px 20px rgba(124,58,237,0.4);pointer-events:auto;display:block;visibility:visible;opacity:1;';
@@ -314,9 +359,11 @@
     document.addEventListener('mouseup', function() { dragging = false; });
     document.getElementById('mk-minimize').addEventListener('click', function() {
       var body = document.getElementById('mk-body');
+      var quota = document.getElementById('mk-quota');
       var hidden = body.style.display === 'none';
       body.style.display = hidden ? '' : 'none';
-      this.textContent = hidden ? '\u2014' : '\uFF0B';
+      if (quota) quota.style.display = hidden ? '' : 'none';
+      this.textContent = hidden ? '—' : '＋';
     });
     console.log('[MK] \u6D6E\u7A97\u5DF2\u521B\u5EFA');
   }
@@ -338,10 +385,34 @@
   function updatePanel(data) {
     var statusEl = document.getElementById('mk-status');
     var resultsEl = document.getElementById('mk-results');
+    var quotaEl   = document.getElementById('mk-quota');
     if (!statusEl || !resultsEl) return;
-    if (!data) { statusEl.textContent = '\u7B49\u5F85\u8FDB\u5165\u623F\u95F4...'; resultsEl.innerHTML = ''; return; }
+    if (!data) { statusEl.textContent = '等待进入房间...'; resultsEl.innerHTML = ''; return; }
 
-    statusEl.textContent = '\u623F\u95F4 ' + data.vid + ' | \u5E84' + data.stats.zhuang + ' \u95F2' + data.stats.xian + ' \u548C' + data.stats.he + ' | \u5171' + data.stats.total + '\u5C40';
+    statusEl.textContent = '房间 ' + data.vid + ' | 庄' + data.stats.zhuang + ' 闲' + data.stats.xian + ' 和' + data.stats.he + ' | 共' + data.stats.total + '局';
+
+    // 更新剩余次数
+    var remaining = getRemaining();
+    if (quotaEl) {
+      if (remaining > 10) {
+        quotaEl.innerHTML = '今日剩余 <span style="color:#34d399;font-weight:700;">' + remaining + '</span> 次';
+      } else if (remaining > 0) {
+        quotaEl.innerHTML = '今日剩余 <span style="color:#fbbf24;font-weight:700;">' + remaining + '</span> 次';
+      } else {
+        quotaEl.innerHTML = '<span style="color:#f87171;font-weight:700;">今日额度已用完</span>';
+      }
+    }
+
+    // 额度用完，隐藏预测内容，显示提示
+    if (isLimitReached()) {
+      resultsEl.innerHTML =
+        '<div style="text-align:center;padding:16px 8px;">' +
+        '<div style="font-size:20px;margin-bottom:8px;">🚫</div>' +
+        '<div style="color:#f87171;font-size:13px;font-weight:700;margin-bottom:6px;">今日计算额度已用完</div>' +
+        '<div style="color:#6b7280;font-size:11px;line-height:1.6;">每日限额 100 次，明天零点自动恢复<br>感谢使用马尔科夫预测系统</div>' +
+        '</div>';
+      return;
+    }
 
     var roads = [
       { name: '\u5927\u8DEF', seq: data.daLu, type: 'daLu', gap: 0 },
@@ -415,10 +486,21 @@
   }
 
   // ── 轮询逻辑 ──────────────────────────────────
+  var _lastVid = null; // 上一次的房间ID，用于检测进入新房间
+
   function poll() {
     if (!panelCreated) createPanel();
     if (!document.getElementById('mk-float-panel')) { panelCreated = false; createPanel(); }
+
     var data = getRoadData();
+
+    // 检测是否进入了房间（vid 从无到有，或 vid 发生变化）
+    var currentVid = data ? data.vid : null;
+    if (currentVid && currentVid !== '未知' && currentVid !== _lastVid) {
+      _lastVid = currentVid;
+      onEnterRoom();
+    }
+
     updatePanel(data);
   }
 
