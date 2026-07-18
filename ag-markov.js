@@ -15,7 +15,7 @@
     var panelCreated = false;
 
     // ── 每日计算额度 ──────────────────────────────
-    var DAILY_LIMIT = 100;
+    var DAILY_LIMIT = 60;
     var STORAGE_KEY_COUNT = 'mk_daily_count';
     var STORAGE_KEY_DATE  = 'mk_daily_date';
 
@@ -207,120 +207,61 @@
     };
   }
 
-  // ── 派生路红蓝转庄闲（正确规则） ─────────────
-  // 基于大路列结构，模拟下一步大路出庄/闲时会产生什么红/蓝
-  // 然后反推：预测的红/蓝对应哪个庄/闲
+  // ── 派生路红蓝转庄闲（验证通过版本） ──────────
+  // offset: 大眼路=1, 小路=2, 小强路=3
   //
-  // 大眼路规则：
-  //   新列(row=0): 前1列长 == 前2列长 → 红, 否则 → 蓝
-  //   续列(row>0): row < 前1列长 → 红
-  //                row == 前1列长 → 蓝(第1个空格)
-  //                row > 前1列长 → 红(第2个空格起)
+  // 规则：
+  //   续列(row>0): 检查「当前列往前offset列」在同行是否有格 → 有=红，无=蓝
+  //   新列(row=0): 比较「前1列长」vs「前(1+offset)列长」，相等=红，不等=蓝
   //
-  // 关键：每产生一个新的大路结果，大路列结构会变化
-  // 如果出跟当前列一样的结果 → 续列(当前列长度+1)
-  // 如果出跟当前列不一样的结果 → 新列(长度1)
+  // 关键：更新列结构时用「本把预测结果的反面」
+  //   因为继续下一把的前提是本把没中，没中=实际出了反面
+
+  function simulateDerivedColor(colLens, lastType, lastLen, addType, offset) {
+    var totalCols = colLens.length;
+    if (addType === lastType) {
+      // 续列：新格行号 = lastLen，检查前offset列在该行是否有格
+      var curRow      = lastLen;
+      var checkColIdx = totalCols - 1 - offset;
+      var checkLen    = (checkColIdx >= 0 ? colLens[checkColIdx] : 0) || 0;
+      return (curRow < checkLen); // true=红, false=蓝
+    } else {
+      // 新列：比较前1列长 vs 前(1+offset)列长
+      var prevLen  = colLens[totalCols - 1] || 0;
+      var prev2Len = (totalCols - 1 - offset >= 0 ? colLens[totalCols - 1 - offset] : 0) || 0;
+      return (prevLen === prev2Len); // 相等=红, 不等=蓝
+    }
+  }
 
   function derivedBitsToZX(predictedBits, colLens, lastColType, lastColLen, gapCols) {
-    // gapCols: 大眼路=1, 小路=2, 小强路=3 (对比间隔)
-    // 返回庄闲序列字符串
-    var result = '';
-    
-    // 模拟大路列结构
-    var simColLens = colLens.slice(); // 拷贝
-    var simLastColType = lastColType;
-    var simLastColLen = lastColLen;
-    var simTotalCols = simColLens.length;
+    // 返回庄闲序列字符串，1=庄→'0', 2=闲→'1'
+    var result      = '';
+    var simColLens  = colLens.slice();
+    var simLastType = lastColType;
+    var simLastLen  = lastColLen;
 
     for (var i = 0; i < predictedBits.length; i++) {
-      var predictedRedBlue = predictedBits[i]; // '0'=红 '1'=蓝
+      var predictedRed = (predictedBits[i] === '0'); // true=红, false=蓝
 
-      // 尝试两种情况：大路出庄(1)或闲(2)
-      // 对每种情况模拟产生的红蓝，看哪个匹配预测
-      var matched = null;
-
+      // 试庄(1)和闲(2)，看哪个产生匹配颜色
+      var matched = 0;
       for (var tryType = 1; tryType <= 2; tryType++) {
-        // 模拟大路出 tryType
-        var newColLen, newColType, newIsNewCol;
-        if (tryType === simLastColType) {
-          // 续列
-          newColLen = simLastColLen + 1;
-          newColType = simLastColType;
-          newIsNewCol = false;
-        } else {
-          // 新列
-          newColLen = 1;
-          newColType = tryType;
-          newIsNewCol = true;
-        }
-
-        // 计算这步会产生什么红蓝（大眼路规则）
-        var genRedBlue;
-        var curColIdx = newIsNewCol ? simTotalCols : simTotalCols - 1;
-        var curRow = newIsNewCol ? 0 : (newColLen - 1);
-
-        // 需要对比的列（前gapCols列）
-        var compareColIdx = curColIdx - gapCols;
-        var compareColLen = (compareColIdx >= 0 && compareColIdx < simColLens.length) ? simColLens[compareColIdx] : 0;
-        // 如果是新列还没push，当前列的前gapCols列
-        if (newIsNewCol) {
-          // curColIdx = simTotalCols (新列还没加入)
-          compareColIdx = simTotalCols - gapCols;
-          compareColLen = (compareColIdx >= 0 && compareColIdx < simColLens.length) ? simColLens[compareColIdx] : 0;
-        } else {
-          // curColIdx = simTotalCols - 1 (当前列)
-          compareColIdx = simTotalCols - 1 - gapCols;
-          compareColLen = (compareColIdx >= 0 && compareColIdx < simColLens.length) ? simColLens[compareColIdx] : 0;
-        }
-
-        if (curRow === 0) {
-          // 新列：比较前1列和前(1+gapCols)列的长度
-          // 大眼路: 比较 curCol-1 和 curCol-2
-          // 小路: 比较 curCol-1 和 curCol-3
-          // 小强路: 比较 curCol-1 和 curCol-4
-          var prevLen, prev2Len;
-          if (newIsNewCol) {
-            prevLen = simColLens[simTotalCols - 1] || 0;
-            prev2Len = simColLens[simTotalCols - 1 - gapCols] || 0;
-          } else {
-            prevLen = simColLens[simTotalCols - 2] || 0;
-            prev2Len = simColLens[simTotalCols - 2 - gapCols] || 0;
-          }
-          genRedBlue = (prevLen === prev2Len) ? '0' : '1'; // 齐脚=红(0) 不齐脚=蓝(1)
-        } else {
-          // 续列：看对比列在同行是否有
-          if (curRow < compareColLen) {
-            genRedBlue = '0'; // 有 → 红
-          } else if (curRow === compareColLen) {
-            genRedBlue = '1'; // 第1个空格 → 蓝
-          } else {
-            genRedBlue = '0'; // 第2个空格起 → 红
-          }
-        }
-
-        if (genRedBlue === predictedRedBlue) {
-          matched = tryType;
-          break;
-        }
+        var genRed = simulateDerivedColor(simColLens, simLastType, simLastLen, tryType, gapCols);
+        if (genRed === predictedRed) { matched = tryType; break; }
       }
+      if (matched === 0) matched = simLastType; // 兜底
 
-      // 如果两种都不匹配或都匹配，默认取续列的那个
-      if (matched === null) {
-        matched = simLastColType; // 默认续列
-      }
-
-      // 记录结果: 1=庄→'0', 2=闲→'1'
       result += (matched === 1) ? '0' : '1';
 
-      // 更新模拟状态
-      if (matched === simLastColType) {
-        simLastColLen++;
-        simColLens[simColLens.length - 1] = simLastColLen;
+      // 用反面更新列结构（本把没中才继续，实际出了反面）
+      var actualType = (matched === 1) ? 2 : 1;
+      if (actualType === simLastType) {
+        simLastLen++;
+        simColLens[simColLens.length - 1] = simLastLen;
       } else {
         simColLens.push(1);
-        simLastColType = matched;
-        simLastColLen = 1;
-        simTotalCols++;
+        simLastType = actualType;
+        simLastLen  = 1;
       }
     }
 
