@@ -282,7 +282,7 @@
         '<span>🔮 马尔科夫预测</span>' +
         '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
       '</div>' +
-      '<div id="mk-quota" style="padding:4px 12px;background:rgba(124,58,237,0.08);border-bottom:1px solid rgba(124,58,237,0.2);font-size:11px;color:#94a3b8;text-align:right;">今日剩余 <span style="color:#34d399;font-weight:700;">100</span> 次</div>' +
+      '<div id="mk-quota" style="padding:4px 12px;background:rgba(124,58,237,0.08);border-bottom:1px solid rgba(124,58,237,0.2);font-size:11px;color:#94a3b8;text-align:right;">今日剩余 <span style="color:#34d399;font-weight:700;">60</span> 次</div>' +
       '<div id="mk-body" style="padding:10px 12px;">' +
         '<div id="mk-status" style="font-size:11px;color:#94a3b8;margin-bottom:8px;">等待进入房间...</div>' +
         '<div id="mk-results"></div>' +
@@ -350,7 +350,7 @@
         '<div style="text-align:center;padding:16px 8px;">' +
         '<div style="font-size:20px;margin-bottom:8px;">🚫</div>' +
         '<div style="color:#f87171;font-size:13px;font-weight:700;margin-bottom:6px;">今日计算额度已用完</div>' +
-        '<div style="color:#6b7280;font-size:11px;line-height:1.6;">每日限额 100 次，明天零点自动恢复<br>感谢使用马尔科夫预测系统</div>' +
+        '<div style="color:#6b7280;font-size:11px;line-height:1.6;">每日限额 60 次，明天零点自动恢复<br>感谢使用马尔科夫预测系统</div>' +
         '</div>';
       return;
     }
@@ -396,12 +396,15 @@
       html += '</div>';
 
       // 一阶
-      if (o1ZX) {
+      if (top1_o1) {
+        // 数字部分：原始派生路红蓝 bits（0=红，1=蓝）
+        // 括号部分：反推大路庄闲（大路直接用bits，下三路用derivedBitsToZX转换）
+        var o1Bits = top1_o1.bits;
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
         html += '<span style="font-size:10px;color:#6b6b8a;">1\u9636</span>';
         html += '<span>';
-        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(o1ZX) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + zxLabel(o1ZX) + '</span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(o1Bits) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + (o1ZX ? zxLabel(o1ZX) : '') + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o1.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
@@ -409,12 +412,15 @@
       }
 
       // 二阶
-      if (o2ZX) {
+      if (top1_o2) {
+        // 数字部分：原始派生路红蓝 bits（0=红，1=蓝）
+        // 括号部分：反推大路庄闲（大路直接用bits，下三路用derivedBitsToZX转换）
+        var o2Bits = top1_o2.bits;
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
         html += '<span style="font-size:10px;color:#6b6b8a;">2\u9636</span>';
         html += '<span>';
-        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(o2ZX) + '</span>';
-        html += '<span style="font-size:9px;margin-left:3px;">' + zxLabel(o2ZX) + '</span>';
+        html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(o2Bits) + '</span>';
+        html += '<span style="font-size:9px;margin-left:3px;">' + (o2ZX ? zxLabel(o2ZX) : '') + '</span>';
         html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o2.p * 100).toFixed(2) + '%</span>';
         html += '</span></div>';
       } else {
