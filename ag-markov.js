@@ -37,9 +37,7 @@
     }
 
     function addDailyUsed() {
-      var today = getTodayStr();
-      localStorage.setItem(STORAGE_KEY_DATE, today);
-      var cur = getDailyUsed();
+      var cur = getDailyUsed(); // 内部已处理日期比对与重置
       var next = cur + 1;
       localStorage.setItem(STORAGE_KEY_COUNT, String(next));
       return next;
@@ -433,20 +431,29 @@
   }
 
   // ── 轮询逻辑 ──────────────────────────────────
-  var _lastVid = null; // 上一次的房间ID，用于检测进入新房间
+  // 从 sessionStorage 恢复上次的 vid，防止刷新后重复计数
+  var _lastVid = sessionStorage.getItem('mk_session_vid') || null;
 
   function poll() {
     if (!panelCreated) createPanel();
     if (!document.getElementById('mk-float-panel')) { panelCreated = false; createPanel(); }
 
     var data = getRoadData();
-
-    // 检测是否进入了房间（vid 从无到有，或 vid 发生变化）
     var currentVid = data ? data.vid : null;
-    if (currentVid && currentVid !== '未知' && currentVid !== _lastVid) {
+
+    if (!currentVid || currentVid === '未知') {
+      // 在大厅/离开房间：清掉记录，下次进房间会重新计数
+      if (_lastVid) {
+        _lastVid = null;
+        sessionStorage.removeItem('mk_session_vid');
+      }
+    } else if (currentVid !== _lastVid) {
+      // 进入新房间（首次或换房间）
       _lastVid = currentVid;
+      sessionStorage.setItem('mk_session_vid', currentVid);
       onEnterRoom();
     }
+    // currentVid === _lastVid：在同一房间（含刷新后恢复），不计数
 
     updatePanel(data);
   }
