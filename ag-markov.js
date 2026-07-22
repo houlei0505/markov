@@ -336,6 +336,15 @@
     if (minBtn) minBtn.textContent = '—';
   }
 
+  function clearSnapshot() {
+    var snapStatus  = document.getElementById('mk-snap-status');
+    var snapTime    = document.getElementById('mk-snap-time');
+    var snapResults = document.getElementById('mk-snap-results');
+    if (snapStatus)  snapStatus.textContent  = '尚未固定';
+    if (snapTime)    snapTime.textContent    = '';
+    if (snapResults) snapResults.innerHTML   = '';
+  }
+
   // ── 浮窗UI ────────────────────────────────────
   function createPanel() {
     if (panelCreated) return;
@@ -538,6 +547,7 @@
       if (_lastVid) {
         _lastVid = null;
         sessionStorage.removeItem('mk_session_vid');
+        clearSnapshot(); // 退出房间时清空快照
       }
     } else if (currentVid !== _lastVid) {
       // 进入新房间（首次或换房间）
