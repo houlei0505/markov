@@ -348,15 +348,15 @@
     panel.innerHTML =
       '<div id="mk-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(124,58,237,0.2);border-radius:10px 10px 0 0;font-weight:600;font-size:12px;cursor:move;">' +
         '<span>🔮 马尔科夫预测</span>' +
-        '<span style="display:flex;align-items:center;gap:8px;">' +
-          '<span id="mk-pin" title="固定当前预测" style="cursor:pointer;font-size:13px;opacity:0.8;">📌</span>' +
-          '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
-        '</span>' +
+        '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
       '</div>' +
       '<div id="mk-quota" style="padding:4px 12px;background:rgba(124,58,237,0.08);border-bottom:1px solid rgba(124,58,237,0.2);font-size:11px;color:#94a3b8;text-align:right;">今日剩余 <span style="color:#34d399;font-weight:700;">60</span> 次</div>' +
       '<div id="mk-body" style="padding:10px 12px;">' +
         '<div id="mk-status" style="font-size:11px;color:#94a3b8;margin-bottom:8px;">等待进入房间...</div>' +
         '<div id="mk-results"></div>' +
+        '<div style="padding-top:8px;">' +
+          '<button id="mk-pin" style="width:100%;padding:9px 0;background:linear-gradient(135deg,#ea580c,#c2410c);border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.05em;box-shadow:0 2px 8px rgba(234,88,12,0.4);">📌 固定当前预测</button>' +
+        '</div>' +
       '</div>';
     panel.style.cssText = 'position:fixed;top:10px;left:10px;z-index:2147483647;background:rgba(15,15,26,0.95);border:2px solid #7c3aed;border-radius:10px;font-family:"Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;color:#e0e0f0;min-width:260px;box-shadow:0 4px 20px rgba(124,58,237,0.4);pointer-events:auto;display:block;visibility:visible;opacity:1;';
     document.body.appendChild(panel);
@@ -379,18 +379,21 @@
       this.textContent = hidden ? '—' : '＋';
     });
 
-    // 📌 快照按钮
+    // 📌 固定当前预测按钮
     document.getElementById('mk-pin').addEventListener('click', function() {
       var statusEl  = document.getElementById('mk-status');
       var resultsEl = document.getElementById('mk-results');
       var statusText  = statusEl  ? statusEl.textContent  : '';
       var resultsHTML = resultsEl ? resultsEl.innerHTML    : '';
       takeSnapshot(statusText, resultsHTML);
-      // 短暂高亮反馈
+      // 短暂反馈
       var btn = this;
-      btn.style.opacity = '1';
-      btn.style.transform = 'scale(1.3)';
-      setTimeout(function() { btn.style.opacity = '0.8'; btn.style.transform = ''; }, 300);
+      btn.textContent = '✅ 已固定！';
+      btn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+      setTimeout(function() {
+        btn.textContent = '📌 固定当前预测';
+        btn.style.background = 'linear-gradient(135deg,#ea580c,#c2410c)';
+      }, 1200);
     });
 
     console.log('[MK] \u6D6E\u7A97\u5DF2\u521B\u5EFA');
