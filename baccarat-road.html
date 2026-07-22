@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>百家乐路单模拟 - 大路 + 大眼仔 + 小路 + 小强路</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      background: #1a6b2a;
+      min-height: 100vh;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+
+    /* 操作按钮区 */
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-zhuang, .btn-xian, .btn-he, .btn-undo, .btn-clear {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.05em;
+    }
+    .btn-zhuang { background: #e53935; color: #fff; box-shadow: 0 3px 8px rgba(229,57,53,0.5); }
+    .btn-zhuang:hover { background: #c62828; }
+    .btn-xian   { background: #1565c0; color: #fff; box-shadow: 0 3px 8px rgba(21,101,192,0.5); }
+    .btn-xian:hover   { background: #0d47a1; }
+    .btn-he     { background: #2e7d32; color: #fff; box-shadow: 0 3px 8px rgba(46,125,50,0.5); border: 2px solid #66bb6a; }
+    .btn-he:hover     { background: #1b5e20; }
+    .btn-undo   { background: #5d4037; color: #fff; }
+    .btn-undo:hover   { background: #4e342e; }
+    .btn-clear  { background: #37474f; color: #cfd8dc; }
+    .btn-clear:hover  { background: #263238; }
+
+    /* 路单容器 */
+    .road-wrap {
+      background: #f5e6c8;
+      border: 3px solid #8b6914;
+      border-radius: 6px;
+      padding: 6px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .road-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #5d3a00;
+      margin-bottom: 4px;
+      padding-left: 2px;
+    }
+
+    /* 格子网格 */
+    .road-grid {
+      display: grid;
+      border: 1px solid #c8a96e;
+      background: #c8a96e;
+      gap: 1px;
+      overflow: hidden;
+    }
+
+    /* 大路：6行 */
+    .road-grid.dalu {
+      grid-template-rows: repeat(6, 36px);
+      grid-template-columns: repeat(40, 36px);
+    }
+
+    /* 大眼仔/小路/小强路：6行 */
+    .road-grid.dayanjzi,
+    .road-grid.xiaolu,
+    .road-grid.xiaoqiang {
+      grid-template-rows: repeat(6, 20px);
+      grid-template-columns: repeat(70, 20px);
+    }
+
+    .cell {
+      background: #f5e6c8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      position: relative;
+    }
+
+    /* 大路棋子 */
+    .circle {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      position: relative;
+    }
+    .circle.zhuang { background: radial-gradient(circle at 35% 35%, #ff6b6b, #c0392b); border: 2px solid #922b21; }
+    .circle.xian   { background: radial-gradient(circle at 35% 35%, #5dade2, #1565c0); border: 2px solid #0d47a1; }
+    .circle.he     { background: radial-gradient(circle at 35% 35%, #58d68d, #1e8449); border: 2px solid #145a32; }
+
+    /* 大眼仔小圆圈 */
+    .mini-circle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+    }
+    .mini-circle.red  { color: #e53935; border-color: #e53935; background: transparent; }
+    .mini-circle.blue { color: #1565c0; border-color: #1565c0; background: transparent; }
+
+    /* 路单上方区域：大路+大眼仔并排 */
+    .roads-row {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .road-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    /* 计数器 */
+    .counter-row {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .cnt-z { color: #ff8a80; }
+    .cnt-x { color: #82b1ff; }
+    .cnt-h { color: #a5d6a7; }
+    .cnt-t { color: #fff; }
+
+    .history-text {
+      color: #aed6a0;
+      font-size: 0.78rem;
+      max-width: 900px;
+      word-break: break-all;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎴 百家乐路单模拟</h1>
+
+<div class="controls">
+  <button class="btn-zhuang" onclick="addResult(1)">庄 (Banker)</button>
+  <button class="btn-xian"   onclick="addResult(2)">闲 (Player)</button>
+  <button class="btn-he"     onclick="addResult(3)">和 (Tie)</button>
+  <button class="btn-undo"   onclick="undoLast()">↩ 撤销</button>
+  <button class="btn-clear"  onclick="clearAll()">🗑 清空</button>
+</div>
+
+<div class="counter-row">
+  <span class="cnt-z">庄: <span id="cnt-z">0</span></span>
+  <span class="cnt-x">闲: <span id="cnt-x">0</span></span>
+  <span class="cnt-h">和: <span id="cnt-h">0</span></span>
+  <span class="cnt-t">共: <span id="cnt-t">0</span></span>
+</div>
+
+<div class="roads-row">
+
+  <!-- 大路 -->
+  <div class="road-wrap">
+    <div class="road-label">大路</div>
+    <div class="road-scroll">
+      <div class="road-grid dalu" id="dalu-grid"></div>
+    </div>
+  </div>
+
+  <!-- 大眼仔 -->
+  <div class="road-wrap">
+    <div class="road-label">大眼仔</div>
+    <div class="road-scroll">
+      <div class="road-grid dayanjzi" id="dayanzi-grid"></div>
+    </div>
+  </div>
+
+  <!-- 小路 -->
+  <div class="road-wrap">
+    <div class="road-label">小路</div>
+    <div class="road-scroll">
+      <div class="road-grid xiaolu" id="xiaolu-grid"></div>
+    </div>
+  </div>
+
+  <!-- 小强路 -->
+  <div class="road-wrap">
+    <div class="road-label">小强路</div>
+    <div class="road-scroll">
+      <div class="road-grid xiaoqiang" id="xiaoqiang-grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="history-text" id="history-text"></div>
+
+<script>
+// ────────────────────────────────────────────────
+// 数据
+// ────────────────────────────────────────────────
+
+// 每局结果：1=庄, 2=闲, 3=和
+var results = [];
+
+// 大路格子配置
+var DALU_ROWS = 6;
+var DALU_COLS = 40;
+var DAYANZI_ROWS = 6;
+var DAYANZI_COLS = 70;
+
+// ────────────────────────────────────────────────
+// 大路布局算法（无拐角版）
+// 同色无限往下延伸，换色才换列从第1行开始。
+// col == logicCol（两者相同，保留 logicCol 字段供下三路使用）
+// ────────────────────────────────────────────────
+function buildDaluLayout(results) {
+  var cells = [];
+  var col = 0;
+  var row = 0;
+  var lastType = 0;
+
+  for (var i = 0; i < results.length; i++) {
+    var t = results[i];
+
+    if (t === 3) {
+      // 和：附在最后一个非和格子上
+      if (cells.length > 0) {
+        cells[cells.length - 1].hePlus = (cells[cells.length - 1].hePlus || 0) + 1;
+      }
+      continue;
+    }
+
+    if (lastType === 0) {
+      col = 0; row = 0;
+    } else if (t === lastType) {
+      row++; // 同色：继续往下，无限延伸
+    } else {
+      col++; row = 0; // 换色：新列，从第1行开始
+    }
+
+    // col 即为逻辑列（无拐角，物理列==逻辑列）
+    cells.push({ col: col, row: row, type: t, hePlus: 0, logicCol: col });
+    lastType = t;
+  }
+
+  return cells;
+}
+
+// 大眼仔：offset=1
+function buildDayanziLayout(daluCells) {
+  return buildDerivedRoad(daluCells, 1, false);
+}
+
+// 小路：offset=2
+function buildXiaoluLayout(daluCells) {
+  return buildDerivedRoad(daluCells, 2, true);
+}
+
+// 小强路：offset=3
+function buildXiaoqiangLayout(daluCells) {
+  return buildDerivedRoad(daluCells, 3, true);
+}
+
+// ────────────────────────────────────────────────
+// 通用衍生路算法（大眼仔 / 小路 / 小强路）
+//
+// 使用 daluCells 的 logicCol 和 row，无限行版本。
+//
+// offset=1 大眼仔：从大路第3列(c>=2)起，或第2列(c==1)的第2行(r>=1)起触发
+//   新列(r=0)：比较 len(c-1) vs len(c-2)，相等→红，不等→蓝
+//   续列(r>0)：看 c-1 列的第r行 vs 第r-1行是否都有格子，相同→红，不同→蓝
+//
+// offset=2 小路：从大路第4列(c>=3)，或第3列(c==2)r>=1 触发
+//   新列：len(c-1) vs len(c-3)
+//   续列：看 c-2 列
+//
+// offset=3 小强路：从大路第5列(c>=4)，或第4列(c==3)r>=1 触发
+//   新列：len(c-1) vs len(c-4)
+//   续列：看 c-3 列
+//
+// 下三路自身也无限行：同色继续往下，换色才换列。
+// ────────────────────────────────────────────────
+function buildDerivedRoad(daluCells, offset, skipFirstRow) {
+  var derivedCells = [];
+  var colLens = []; // 大路每列已出现的行数（随遍历逐步积累）
+
+  var dCol = 0;
+  var dRow = 0;
+  var lastIsRed = null;
+
+  for (var i = 0; i < daluCells.length; i++) {
+    var cell = daluCells[i];
+    var c = cell.logicCol;
+    var r = cell.row;
+
+    // 先更新大路列长（此格生成前的状态作为判断依据，所以在判断后再更新）
+    // 实际上新列(r=0)时 colLens[c] 应为0（本列第一格），续列时已有值
+    // 为保证"先判断再更新"，在判断完后再写入
+    while (colLens.length <= c) colLens.push(0);
+
+    var isNewCol = (r === 0);
+    var refCol = c - 1 - offset;
+
+    // 触发条件
+    var triggered = skipFirstRow
+      ? (c > offset) || (c === offset && r > 0)
+      : (refCol >= 0);
+
+    if (triggered) {
+      var entryRed;
+      if (isNewCol) {
+        // 新列：比较前一列长度 vs 远端列长度
+        var prevLen = colLens[c - 1] || 0;
+        var refLen  = (refCol >= 0 ? colLens[refCol] : 0) || 0;
+        entryRed = (prevLen === refLen);
+      } else {
+        // 续列：检查参考列的第r行和第r-1行是否都存在
+        // 大眼仔(offset=1)：看 c-1 列；小路(offset=2)：看 c-2 列；小强路(offset=3)：看 c-3 列
+        var checkCol = c - offset;
+        var checkLen = (checkCol >= 0 ? colLens[checkCol] : 0) || 0;
+        var hasCur  = (r     < checkLen);
+        var hasPrev = (r - 1 < checkLen);
+        entryRed = (hasCur === hasPrev);
+      }
+
+      // 放置衍生路格子：同色→往下（无限），换色→新列第1行
+      if (lastIsRed === null) {
+        dCol = 0; dRow = 0;
+      } else if (entryRed === lastIsRed) {
+        dRow++; // 无限往下，不再限制行数
+      } else {
+        dCol++; dRow = 0;
+      }
+
+      derivedCells.push({ col: dCol, row: dRow, isRed: entryRed });
+      lastIsRed = entryRed;
+    }
+
+    // 判断完毕后更新大路列长
+    colLens[c] = r + 1;
+  }
+
+  return derivedCells;
+}
+
+// ────────────────────────────────────────────────
+// 渲染大路（无限行版）
+// ────────────────────────────────────────────────
+function renderDalu(cells) {
+  var grid = document.getElementById('dalu-grid');
+
+  // 计算需要多少行、多少列
+  var maxCol = 0, maxRow = 0;
+  for (var i = 0; i < cells.length; i++) {
+    if (cells[i].col > maxCol) maxCol = cells[i].col;
+    if (cells[i].row > maxRow) maxRow = cells[i].row;
+  }
+  var totalCols = Math.max(DALU_COLS, maxCol + 5);
+  var totalRows = Math.max(DALU_ROWS, maxRow + 1);
+
+  grid.style.gridTemplateColumns = 'repeat(' + totalCols + ', 36px)';
+  grid.style.gridTemplateRows    = 'repeat(' + totalRows + ', 36px)';
+
+  // 建立格子映射
+  var map = {};
+  for (var i = 0; i < cells.length; i++) {
+    map[cells[i].col + '_' + cells[i].row] = cells[i];
+  }
+
+  var html = '';
+  for (var r = 0; r < totalRows; r++) {
+    for (var c = 0; c < totalCols; c++) {
+      var cell = map[c + '_' + r];
+      if (cell) {
+        var cls   = cell.type === 1 ? 'zhuang' : (cell.type === 2 ? 'xian' : 'he');
+        var label = cell.type === 1 ? '庄'     : (cell.type === 2 ? '闲'   : '和');
+        html += '<div class="cell"><div class="circle ' + cls + '">' + label;
+        if (cell.hePlus > 0) {
+          html += '<span style="position:absolute;top:-4px;right:-4px;background:#2e7d32;color:#fff;border-radius:50%;width:12px;height:12px;font-size:8px;display:flex;align-items:center;justify-content:center;border:1px solid #145a32;">' + cell.hePlus + '</span>';
+        }
+        html += '</div></div>';
+      } else {
+        html += '<div class="cell"></div>';
+      }
+    }
+  }
+  grid.innerHTML = html;
+}
+
+// ────────────────────────────────────────────────
+// 渲染大眼仔 / 小路 / 小强路（无限行版）
+// ────────────────────────────────────────────────
+function renderMiniRoad(cells, gridId, totalColsMin) {
+  var grid = document.getElementById(gridId);
+
+  var maxCol = 0, maxRow = 0;
+  for (var i = 0; i < cells.length; i++) {
+    if (cells[i].col > maxCol) maxCol = cells[i].col;
+    if (cells[i].row > maxRow) maxRow = cells[i].row;
+  }
+  var totalCols = Math.max(totalColsMin, maxCol + 5);
+  var totalRows = Math.max(DAYANZI_ROWS, maxRow + 1);
+
+  grid.style.gridTemplateColumns = 'repeat(' + totalCols + ', 20px)';
+  grid.style.gridTemplateRows    = 'repeat(' + totalRows + ', 20px)';
+
+  var map = {};
+  for (var i = 0; i < cells.length; i++) {
+    map[cells[i].col + '_' + cells[i].row] = cells[i];
+  }
+
+  var html = '';
+  for (var r = 0; r < totalRows; r++) {
+    for (var c = 0; c < totalCols; c++) {
+      var cell = map[c + '_' + r];
+      if (cell) {
+        var cls = cell.isRed ? 'red' : 'blue';
+        html += '<div class="cell"><div class="mini-circle ' + cls + '"></div></div>';
+      } else {
+        html += '<div class="cell"></div>';
+      }
+    }
+  }
+  grid.innerHTML = html;
+}
+
+// ────────────────────────────────────────────────
+// 更新计数器
+// ────────────────────────────────────────────────
+function updateCounters() {
+  var z = 0, x = 0, h = 0;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i] === 1) z++;
+    else if (results[i] === 2) x++;
+    else h++;
+  }
+  document.getElementById('cnt-z').textContent = z;
+  document.getElementById('cnt-x').textContent = x;
+  document.getElementById('cnt-h').textContent = h;
+  document.getElementById('cnt-t').textContent = results.length;
+
+  var histLabels = results.map(function(r) {
+    return r === 1 ? '庄' : (r === 2 ? '闲' : '和');
+  });
+  document.getElementById('history-text').textContent = histLabels.length > 0
+    ? '记录：' + histLabels.join(' ')
+    : '';
+}
+
+// ────────────────────────────────────────────────
+// 主渲染入口
+// ────────────────────────────────────────────────
+function render() {
+  var daluCells     = buildDaluLayout(results);
+  var dayanziCells  = buildDayanziLayout(daluCells);
+  var xiaoluCells   = buildXiaoluLayout(daluCells);
+  var xiaoqiangCells = buildXiaoqiangLayout(daluCells);
+
+  renderDalu(daluCells);
+  renderMiniRoad(dayanziCells,   'dayanzi-grid',  DAYANZI_COLS);
+  renderMiniRoad(xiaoluCells,    'xiaolu-grid',   DAYANZI_COLS);
+  renderMiniRoad(xiaoqiangCells, 'xiaoqiang-grid', DAYANZI_COLS);
+  updateCounters();
+}
+
+// ────────────────────────────────────────────────
+// 操作
+// ────────────────────────────────────────────────
+function addResult(type) {
+  results.push(type);
+  render();
+}
+
+function undoLast() {
+  if (results.length > 0) {
+    results.pop();
+    render();
+  }
+}
+
+function clearAll() {
+  results = [];
+  render();
+}
+
+// ────────────────────────────────────────────────
+// 初始化
+// ────────────────────────────────────────────────
+
+// ════════════════════════════════════════════════
+// 【新增】大眼路红蓝 → 庄闲反推
+// ════════════════════════════════════════════════
+
+/**
+ * 从大路 daluCells 提取每逻辑列长度数组（用于下三路预测）
+ */
+function getDaluColLens(daluCells) {
+  var colLens = [];
+  for (var i = 0; i < daluCells.length; i++) {
+    var c = daluCells[i].logicCol; // 使用逻辑列
+    var r = daluCells[i].row;
+    while (colLens.length <= c) colLens.push(0);
+    if (r + 1 > colLens[c]) colLens[c] = r + 1;
+  }
+  return colLens;
+}
+
+/**
+ * 从大路 daluCells 获取最后一逻辑列的类型(1=庄/2=闲)和长度
+ */
+function getDaluLastCol(daluCells) {
+  if (daluCells.length === 0) return { type: 0, len: 0 };
+  var lastLogicCol = daluCells[daluCells.length - 1].logicCol;
+  var lastColType = daluCells[daluCells.length - 1].type;
+  // 逻辑列长度 = 该逻辑列所有格子的 row 最大值 + 1
+  var maxRow = 0;
+  for (var i = daluCells.length - 1; i >= 0; i--) {
+    if (daluCells[i].logicCol === lastLogicCol) {
+      if (daluCells[i].row > maxRow) maxRow = daluCells[i].row;
+    } else {
+      break;
+    }
+  }
+  return { type: lastColType, len: maxRow + 1 };
+}
+
+/**
+ * 模拟大路追加一个结果(1=庄/2=闲)后，指定衍生路会产生红(true)还是蓝(false)
+ * colLens: 当前大路各列长度数组
+ * lastType: 当前最后一列的类型(1或2)
+ * lastLen:  当前最后一列的长度
+ * addType:  即将追加的类型(1或2)
+ * offset:   1=大眼路, 2=小路, 3=小强路
+ *
+ * 规则：
+ *   续列(addType===lastType, row=lastLen):
+ *     看 当前列(totalCols-1) 往左 offset 列 的 row 和 row-1 是否同状态
+ *     hasCur  = (lastLen   < colLens[curColIdx - offset])
+ *     hasPrev = (lastLen-1 < colLens[curColIdx - offset])
+ *     相同→红，不同→蓝
+ *   新列(addType!==lastType, row=0):
+ *     比较 len(最后一列) vs len(最后一列 - offset)
+ *     相等→红，不等→蓝
+ */
+function simulateDerivedColor(colLens, lastType, lastLen, addType, offset) {
+  var totalCols = colLens.length;
+
+  if (addType === lastType) {
+    // ── 续列 ──
+    var curRow     = lastLen;           // 新格的行号(0-based)
+    var curColIdx  = totalCols - 1;     // 当前列索引
+    var checkIdx   = curColIdx - offset;
+    var checkLen   = (checkIdx >= 0 ? colLens[checkIdx] : 0) || 0;
+    var hasCur  = (curRow     < checkLen);
+    var hasPrev = (curRow - 1 < checkLen);
+    return (hasCur === hasPrev);
+  } else {
+    // ── 新列 ──
+    // 触发条件：新列索引 = totalCols，需要 totalCols - 1 - offset >= 0
+    if (totalCols - 1 - offset < 0) return true; // 尚未到触发点，默认红
+    var prevLen  = colLens[totalCols - 1] || 0;
+    var refLen   = colLens[totalCols - 1 - offset] || 0;
+    return (prevLen === refLen);
+  }
+}
+
+/**
+ * 将4个红蓝预测 bits 逐一反推为庄/闲
+ *
+ * 语义：bits[i] = 下注 matched 后，matched 追加到大路产生的派生路颜色
+ *       找 matched 使得 simulateDerivedColor(cl,lt,ll,matched,offset) === pRed
+ *       没中（matched 对立面出现）→ 用对立面更新大路状态再推下一把
+ *
+ * bits: 字符串如 '0110'，'0'=红，'1'=蓝
+ * offset: 1=大眼路, 2=小路, 3=小强路
+ */
+function derivedToZhuangXian(bits, colLens, lastType, lastLen, offset) {
+  var result = [];
+  var cl = colLens.slice();
+  var lt = lastType;
+  var ll = lastLen;
+
+  for (var i = 0; i < bits.length; i++) {
+    var predictedRed = (bits[i] === '0');
+
+    // 找 matched：追加 matched 后派生路颜色 = predictedRed
+    var matched = 0;
+    for (var tryType = 1; tryType <= 2; tryType++) {
+      var genRed = simulateDerivedColor(cl, lt, ll, tryType, offset);
+      if (genRed === predictedRed) { matched = tryType; break; }
+    }
+    if (matched === 0) matched = lt; // 兜底
+
+    result.push(matched === 1 ? '庄' : '闲');
+
+    // 没中 → 对立面出现 → 用对立面更新大路状态
+    var actual = matched === 1 ? 2 : 1;
+    if (actual === lt) {
+      ll++;
+      cl[cl.length - 1] = ll;
+    } else {
+      cl.push(1);
+      lt = actual;
+      ll = 1;
+    }
+  }
+  return result;
+}
+
+// 锁定的随机bits和庄闲结果，生成一次后不再变
+var _lockedBits = null;
+var _lockedZX   = null;
+// 当前选中的路：1=大眼路, 2=小路, 3=小强路
+var _selectedRoad = 1;
+var _roadNames = { 1: '大眼路', 2: '小路', 3: '小强路' };
+
+/**
+ * 主入口：生成预测并渲染到面板
+ */
+function renderPrediction() {
+  var panel = document.getElementById('prediction-panel');
+  var titleEl = document.getElementById('predict-title');
+  if (!panel) return;
+
+  // 更新标题
+  if (titleEl) titleEl.textContent = '🔮 ' + _roadNames[_selectedRoad] + ' 庄闲反推';
+
+  // 过滤掉和局
+  var nonTie = results.filter(function(r) { return r !== 3; });
+
+  if (nonTie.length < 20) {
+    _lockedBits = null;
+    _lockedZX   = null;
+    panel.innerHTML = '<span style="color:#aaa;">（满20局非和局后显示推测）目前 ' + nonTie.length + '/20 局</span>';
+    return;
+  }
+
+  // 满20局后：只在第一次（或点🎲）时生成并锁定
+  if (_lockedBits === null) {
+    _lockedBits = '';
+    for (var i = 0; i < 4; i++) _lockedBits += (Math.random() < 0.5 ? '0' : '1');
+
+    var daluCells = buildDaluLayout(results);
+    var colLens   = getDaluColLens(daluCells);
+    var lastCol   = getDaluLastCol(daluCells);
+    _lockedZX = derivedToZhuangXian(_lockedBits, colLens, lastCol.type, lastCol.len, _selectedRoad);
+    // 存储快照供调试显示
+    _lockedZX._colLens  = colLens;
+    _lockedZX._lastCol  = lastCol;
+  }
+
+  var bits   = _lockedBits;
+  var zxList = _lockedZX;
+  var colLensSnap = _lockedZX._colLens || [];
+  var lastColSnap = _lockedZX._lastCol || { type: 0, len: 0 };
+
+  // 渲染
+  var roadName = _roadNames[_selectedRoad];
+  var html = '<div style="margin-bottom:8px;font-size:11px;color:#888;">' + roadName + ' 随机预测（验证庄闲反推）</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+
+  for (var j = 0; j < 4; j++) {
+    var rbLabel = bits[j] === '0' ? '红' : '蓝';
+    var rbColor = bits[j] === '0' ? '#e53935' : '#1565c0';
+    var zxLbl   = zxList[j];
+    var zxColor = zxLbl === '庄' ? '#e53935' : '#1565c0';
+    html += '<div style="text-align:center;background:rgba(255,255,255,0.06);border-radius:8px;padding:7px 12px;min-width:52px;">';
+    html += '<div style="font-size:10px;color:#666;margin-bottom:3px;">第' + (j + 1) + '把</div>';
+    html += '<div style="font-size:15px;font-weight:700;color:' + rbColor + ';">' + rbLabel + '</div>';
+    html += '<div style="font-size:11px;color:#555;">↓</div>';
+    html += '<div style="font-size:15px;font-weight:700;color:' + zxColor + ';">' + zxLbl + '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  html += '<div style="margin-top:8px;font-size:10px;color:#555;">bits: ' + bits + '　末列: ' + (lastColSnap.type === 1 ? '庄' : '闲') + 'x' + lastColSnap.len + '</div>';
+
+  panel.innerHTML = html;
+}
+
+// 切换路
+function selectRoad(offset) {
+  _selectedRoad = offset;
+  // 切换路时重置锁定，重新计算
+  _lockedBits = null;
+  _lockedZX   = null;
+  // 更新按钮高亮
+  [1, 2, 3].forEach(function(o) {
+    var btn = document.getElementById('road-btn-' + o);
+    if (!btn) return;
+    btn.style.background  = (o === offset) ? '#7c3aed' : 'rgba(124,58,237,0.2)';
+    btn.style.color       = (o === offset) ? '#fff'    : '#c4b5fd';
+  });
+  renderPrediction();
+}
+
+// 重写 render，追加调用预测
+var _origRender = render;
+render = function() {
+  _origRender();
+  renderPrediction();
+};
+
+// 重新随机：清掉锁定，重新生成
+function reRandomPredict() {
+  _lockedBits = null;
+  _lockedZX   = null;
+  renderPrediction();
+}
+
+// 悬浮窗拖动 + 收起
+document.addEventListener('DOMContentLoaded', function() {
+  var panel  = document.getElementById('predict-float');
+  var header = document.getElementById('predict-header');
+  var body   = document.getElementById('predict-body');
+  var toggle = document.getElementById('predict-toggle');
+  if (!panel || !header) return;
+
+  // 拖动
+  var dragging = false, ox = 0, oy = 0;
+  header.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON' || e.target.id === 'predict-toggle') return;
+    dragging = true;
+    ox = e.clientX - panel.offsetLeft;
+    oy = e.clientY - panel.offsetTop;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    panel.style.right  = 'auto';
+    panel.style.bottom = 'auto';
+    panel.style.left   = (e.clientX - ox) + 'px';
+    panel.style.top    = (e.clientY - oy) + 'px';
+  });
+  document.addEventListener('mouseup', function() { dragging = false; });
+
+  // 收起/展开（同时隐藏/显示路选择器和内容区）
+  toggle.addEventListener('click', function() {
+    var collapsed = body.style.display === 'none';
+    var selector  = document.getElementById('predict-road-selector');
+    body.style.display              = collapsed ? '' : 'none';
+    if (selector) selector.style.display = collapsed ? '' : 'none';
+    toggle.textContent  = collapsed ? '—' : '＋';
+  });
+});
+
+render();
+</script>
+
+<!-- 【新增】悬浮预测面板 -->
+<div id="predict-float" style="position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(15,15,26,0.96);border:2px solid #7c3aed;border-radius:12px;width:270px;box-shadow:0 4px 24px rgba(124,58,237,0.5);font-family:'Microsoft YaHei','Segoe UI',sans-serif;user-select:none;">
+  <!-- 标题栏（可拖动） -->
+  <div id="predict-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(124,58,237,0.2);border-radius:10px 10px 0 0;cursor:move;">
+    <span id="predict-title" style="color:#c4b5fd;font-weight:700;font-size:13px;">🔮 大眼路 庄闲反推</span>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button onclick="reRandomPredict()" title="重新随机" style="padding:2px 8px;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;">🎲</button>
+      <span id="predict-toggle" style="cursor:pointer;font-size:15px;color:#c4b5fd;line-height:1;" title="收起/展开">—</span>
+    </div>
+  </div>
+  <!-- 路选择器 -->
+  <div id="predict-road-selector" style="display:flex;gap:6px;padding:8px 12px 4px;border-bottom:1px solid rgba(124,58,237,0.25);">
+    <button id="road-btn-1" onclick="selectRoad(1)" style="flex:1;padding:4px 0;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">大眼路</button>
+    <button id="road-btn-2" onclick="selectRoad(2)" style="flex:1;padding:4px 0;background:rgba(124,58,237,0.2);color:#c4b5fd;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">小路</button>
+    <button id="road-btn-3" onclick="selectRoad(3)" style="flex:1;padding:4px 0;background:rgba(124,58,237,0.2);color:#c4b5fd;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">小强路</button>
+  </div>
+  <!-- 内容区 -->
+  <div id="predict-body" style="padding:12px;">
+    <div id="prediction-panel" style="color:#e0e0f0;font-size:12px;">
+      （满20局非和局后显示）目前 0/20 局
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

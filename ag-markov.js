@@ -205,65 +205,135 @@
     };
   }
 
-  // ── 派生路红蓝转庄闲（验证通过版本） ──────────
+  // ── 派生路红蓝转庄闲 ──────────────────────────
   // offset: 大眼路=1, 小路=2, 小强路=3
   //
   // 规则：
-  //   续列(row>0): 检查「当前列往前offset列」在同行是否有格 → 有=红，无=蓝
-  //   新列(row=0): 比较「前1列长」vs「前(1+offset)列长」，相等=红，不等=蓝
-  //
-  // 关键：更新列结构时用「本把预测结果的反面」
-  //   因为继续下一把的前提是本把没中，没中=实际出了反面
+  //   续列(addType===lastType): 参考列(往左offset列)在curRow和curRow-1行是否同状态，相同→红，不同→蓝
+  //   新列(addType!==lastType): 前1列长 vs 前(1+offset)列长，相等→红，不等→蓝
 
   function simulateDerivedColor(colLens, lastType, lastLen, addType, offset) {
     var totalCols = colLens.length;
     if (addType === lastType) {
-      // 续列：新格行号 = lastLen，检查前offset列在该行是否有格
+      // 续列
       var curRow      = lastLen;
       var checkColIdx = totalCols - 1 - offset;
       var checkLen    = (checkColIdx >= 0 ? colLens[checkColIdx] : 0) || 0;
-      return (curRow < checkLen); // true=红, false=蓝
+      var hasCur  = (curRow     < checkLen);
+      var hasPrev = (curRow - 1 < checkLen);
+      return (hasCur === hasPrev); // true=红, false=蓝
     } else {
-      // 新列：比较前1列长 vs 前(1+offset)列长
+      // 新列
       var prevLen  = colLens[totalCols - 1] || 0;
       var prev2Len = (totalCols - 1 - offset >= 0 ? colLens[totalCols - 1 - offset] : 0) || 0;
-      return (prevLen === prev2Len); // 相等=红, 不等=蓝
+      return (prevLen === prev2Len);
     }
   }
 
   function derivedBitsToZX(predictedBits, colLens, lastColType, lastColLen, gapCols) {
-    // 返回庄闲序列字符串，1=庄→'0', 2=闲→'1'
-    var result      = '';
-    var simColLens  = colLens.slice();
-    var simLastType = lastColType;
-    var simLastLen  = lastColLen;
+    // 返回庄闲序列字符串，庄→'0', 闲→'1'
+    //
+    // 语义：bits[i] = 下注 matched 后，matched 追加大路产生的派生路颜色
+    //   找 matched 使得 simulateDerivedColor(matched) === pRed
+    //   没中（matched 对立面出现）→ 用对立面更新大路状态再推下一把
+    var result  = '';
+    var cl      = colLens.slice();
+    var lt      = lastColType;
+    var ll      = lastColLen;
 
     for (var i = 0; i < predictedBits.length; i++) {
       var predictedRed = (predictedBits[i] === '0'); // true=红, false=蓝
 
-      // 试庄(1)和闲(2)，看哪个产生匹配颜色
+      // 找 matched：追加 matched 后产生 predictedRed
       var matched = 0;
       for (var tryType = 1; tryType <= 2; tryType++) {
-        var genRed = simulateDerivedColor(simColLens, simLastType, simLastLen, tryType, gapCols);
-        if (genRed === predictedRed) { matched = tryType; break; }
+        if (simulateDerivedColor(cl, lt, ll, tryType, gapCols) === predictedRed) {
+          matched = tryType; break;
+        }
       }
-      if (matched === 0) matched = simLastType; // 兜底
+      if (matched === 0) matched = lt; // 兜底
 
       result += (matched === 1) ? '0' : '1';
 
-      // 用反面更新列结构（本把没中才继续，实际出了反面）
-      var actualType = (matched === 1) ? 2 : 1;
-      if (actualType === simLastType) {
-        simLastLen++;
-        simColLens[simColLens.length - 1] = simLastLen;
+      // 没中 → 对立面出现 → 用对立面更新大路状态
+      var actual = matched === 1 ? 2 : 1;
+      if (actual === lt) {
+        ll++;
+        cl[cl.length - 1] = ll;
       } else {
-        simColLens.push(1);
-        simLastType = actualType;
-        simLastLen  = 1;
+        cl.push(1);
+        lt = actual;
+        ll = 1;
       }
     }
 
     return result;
+  }
+
+  // ── 快照面板 ──────────────────────────────────
+  var _snapshotPanelCreated = false;
+
+  function createSnapshotPanel() {
+    if (_snapshotPanelCreated) return;
+    var old = document.getElementById('mk-snap-panel');
+    if (old) old.remove();
+
+    var panel = document.createElement('div');
+    panel.id = 'mk-snap-panel';
+    panel.innerHTML =
+      '<div id="mk-snap-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(234,88,12,0.2);border-radius:10px 10px 0 0;font-weight:600;font-size:12px;cursor:move;">' +
+        '<span>📌 快照</span>' +
+        '<span id="mk-snap-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
+      '</div>' +
+      '<div id="mk-snap-body" style="padding:10px 12px;">' +
+        '<div id="mk-snap-status" style="font-size:11px;color:#94a3b8;margin-bottom:8px;">尚未固定</div>' +
+        '<div id="mk-snap-time" style="font-size:10px;color:#6b7280;margin-bottom:6px;"></div>' +
+        '<div id="mk-snap-results"></div>' +
+      '</div>';
+    panel.style.cssText = 'position:fixed;top:10px;left:290px;z-index:2147483647;background:rgba(15,15,26,0.95);border:2px solid #ea580c;border-radius:10px;font-family:"Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;color:#e0e0f0;min-width:260px;box-shadow:0 4px 20px rgba(234,88,12,0.4);pointer-events:auto;display:block;visibility:visible;opacity:1;';
+    document.body.appendChild(panel);
+    _snapshotPanelCreated = true;
+
+    // 拖动
+    var header = document.getElementById('mk-snap-header');
+    var dragging = false, offsetX = 0, offsetY = 0;
+    header.addEventListener('mousedown', function(e) {
+      dragging = true; offsetX = e.clientX - panel.offsetLeft; offsetY = e.clientY - panel.offsetTop; e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) { if (!dragging) return; panel.style.left = (e.clientX - offsetX) + 'px'; panel.style.top = (e.clientY - offsetY) + 'px'; });
+    document.addEventListener('mouseup', function() { dragging = false; });
+
+    // 收起
+    document.getElementById('mk-snap-minimize').addEventListener('click', function() {
+      var body = document.getElementById('mk-snap-body');
+      var hidden = body.style.display === 'none';
+      body.style.display = hidden ? '' : 'none';
+      this.textContent = hidden ? '—' : '＋';
+    });
+  }
+
+  function takeSnapshot(statusText, resultsHTML) {
+    if (!_snapshotPanelCreated) createSnapshotPanel();
+    var snapStatus  = document.getElementById('mk-snap-status');
+    var snapTime    = document.getElementById('mk-snap-time');
+    var snapResults = document.getElementById('mk-snap-results');
+    if (!snapStatus || !snapResults) return;
+
+    snapStatus.textContent = statusText || '—';
+
+    var now = new Date();
+    var hh = now.getHours().toString().padStart(2, '0');
+    var mm = now.getMinutes().toString().padStart(2, '0');
+    var ss = now.getSeconds().toString().padStart(2, '0');
+    snapTime.textContent = '固定于 ' + hh + ':' + mm + ':' + ss;
+
+    snapResults.innerHTML = resultsHTML || '';
+
+    // 展开（防止之前被收起）
+    var body = document.getElementById('mk-snap-body');
+    var minBtn = document.getElementById('mk-snap-minimize');
+    if (body) body.style.display = '';
+    if (minBtn) minBtn.textContent = '—';
   }
 
   // ── 浮窗UI ────────────────────────────────────
@@ -278,7 +348,10 @@
     panel.innerHTML =
       '<div id="mk-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(124,58,237,0.2);border-radius:10px 10px 0 0;font-weight:600;font-size:12px;cursor:move;">' +
         '<span>🔮 马尔科夫预测</span>' +
-        '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
+        '<span style="display:flex;align-items:center;gap:8px;">' +
+          '<span id="mk-pin" title="固定当前预测" style="cursor:pointer;font-size:13px;opacity:0.8;">📌</span>' +
+          '<span id="mk-minimize" style="cursor:pointer;font-size:14px;">—</span>' +
+        '</span>' +
       '</div>' +
       '<div id="mk-quota" style="padding:4px 12px;background:rgba(124,58,237,0.08);border-bottom:1px solid rgba(124,58,237,0.2);font-size:11px;color:#94a3b8;text-align:right;">今日剩余 <span style="color:#34d399;font-weight:700;">60</span> 次</div>' +
       '<div id="mk-body" style="padding:10px 12px;">' +
@@ -296,6 +369,7 @@
     });
     document.addEventListener('mousemove', function(e) { if (!dragging) return; panel.style.left = (e.clientX - offsetX) + 'px'; panel.style.top = (e.clientY - offsetY) + 'px'; });
     document.addEventListener('mouseup', function() { dragging = false; });
+
     document.getElementById('mk-minimize').addEventListener('click', function() {
       var body = document.getElementById('mk-body');
       var quota = document.getElementById('mk-quota');
@@ -304,6 +378,21 @@
       if (quota) quota.style.display = hidden ? '' : 'none';
       this.textContent = hidden ? '—' : '＋';
     });
+
+    // 📌 快照按钮
+    document.getElementById('mk-pin').addEventListener('click', function() {
+      var statusEl  = document.getElementById('mk-status');
+      var resultsEl = document.getElementById('mk-results');
+      var statusText  = statusEl  ? statusEl.textContent  : '';
+      var resultsHTML = resultsEl ? resultsEl.innerHTML    : '';
+      takeSnapshot(statusText, resultsHTML);
+      // 短暂高亮反馈
+      var btn = this;
+      btn.style.opacity = '1';
+      btn.style.transform = 'scale(1.3)';
+      setTimeout(function() { btn.style.opacity = '0.8'; btn.style.transform = ''; }, 300);
+    });
+
     console.log('[MK] \u6D6E\u7A97\u5DF2\u521B\u5EFA');
   }
 
