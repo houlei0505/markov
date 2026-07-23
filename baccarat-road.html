@@ -517,20 +517,98 @@ function clearAll() {
 }
 
 // ────────────────────────────────────────────────
-// 初始化
+// 马尔科夫预测（与 ag-markov.js 完全一致）
 // ────────────────────────────────────────────────
 
-// ════════════════════════════════════════════════
-// 【新增】大眼路红蓝 → 庄闲反推
-// ════════════════════════════════════════════════
+var PREDICT_LEN = 4;
 
-/**
- * 从大路 daluCells 提取每逻辑列长度数组（用于下三路预测）
- */
+// ── 一阶马尔科夫 ──
+function buildMarkov1(seq) {
+  var counts = { '0': { '0': 0, '1': 0 }, '1': { '0': 0, '1': 0 } };
+  for (var i = 0; i < seq.length - 1; i++) {
+    counts[seq[i]][seq[i + 1]]++;
+  }
+  var prob = {};
+  var states = ['0', '1'];
+  for (var si = 0; si < states.length; si++) {
+    var from = states[si];
+    var total = counts[from]['0'] + counts[from]['1'];
+    prob[from] = {
+      '0': total ? counts[from]['0'] / total : 0.5,
+      '1': total ? counts[from]['1'] / total : 0.5
+    };
+  }
+  return prob;
+}
+
+function predictTop1Order1(seq) {
+  if (seq.length < 3) return null;
+  var prob = buildMarkov1(seq);
+  var lastBit = seq[seq.length - 1];
+  var n = PREDICT_LEN;
+  var total = Math.pow(2, n);
+  var bestBits = '';
+  var bestP = -1;
+  for (var mask = 0; mask < total; mask++) {
+    var bits = mask.toString(2).padStart(n, '0');
+    var p = 1;
+    var cur = lastBit;
+    for (var j = 0; j < bits.length; j++) {
+      p *= prob[cur][bits[j]];
+      cur = bits[j];
+    }
+    if (p > bestP) { bestP = p; bestBits = bits; }
+  }
+  return { bits: bestBits, p: bestP };
+}
+
+// ── 二阶马尔科夫 ──
+function buildMarkov2(seq) {
+  var states = ['00', '01', '10', '11'];
+  var counts = {};
+  for (var si = 0; si < states.length; si++) counts[states[si]] = { '0': 0, '1': 0 };
+  for (var i = 0; i < seq.length - 2; i++) {
+    var from = seq[i] + seq[i + 1];
+    if (counts[from]) counts[from][seq[i + 2]]++;
+  }
+  var prob = {};
+  for (var si2 = 0; si2 < states.length; si2++) {
+    var s = states[si2];
+    var total = counts[s]['0'] + counts[s]['1'];
+    prob[s] = {
+      '0': total ? counts[s]['0'] / total : 0.5,
+      '1': total ? counts[s]['1'] / total : 0.5
+    };
+  }
+  return prob;
+}
+
+function predictTop1Order2(seq) {
+  if (seq.length < 5) return null;
+  var prob = buildMarkov2(seq);
+  var lastTwo = seq[seq.length - 2] + seq[seq.length - 1];
+  var n = PREDICT_LEN;
+  var total = Math.pow(2, n);
+  var bestBits = '';
+  var bestP = -1;
+  for (var mask = 0; mask < total; mask++) {
+    var bits = mask.toString(2).padStart(n, '0');
+    var p = 1;
+    var cur = lastTwo;
+    for (var j = 0; j < bits.length; j++) {
+      p *= (prob[cur] ? prob[cur][bits[j]] : 0.5);
+      cur = cur[1] + bits[j];
+    }
+    if (p > bestP) { bestP = p; bestBits = bits; }
+  }
+  return { bits: bestBits, p: bestP };
+}
+
+// ── 辅助：从 daluCells 提取列长数组 ──
 function getDaluColLens(daluCells) {
   var colLens = [];
   for (var i = 0; i < daluCells.length; i++) {
-    var c = daluCells[i].logicCol; // 使用逻辑列
+    var c = daluCells[i].logicCol;
     var r = daluCells[i].row;
     while (colLens.length <= c) colLens.push(0);
     if (r + 1 > colLens[c]) colLens[c] = r + 1;
@@ -538,95 +616,74 @@ function getDaluColLens(daluCells) {
   return colLens;
 }
 
-/**
- * 从大路 daluCells 获取最后一逻辑列的类型(1=庄/2=闲)和长度
- */
+// ── 辅助：从 daluCells 获取最后一列类型和长度 ──
 function getDaluLastCol(daluCells) {
   if (daluCells.length === 0) return { type: 0, len: 0 };
   var lastLogicCol = daluCells[daluCells.length - 1].logicCol;
-  var lastColType = daluCells[daluCells.length - 1].type;
-  // 逻辑列长度 = 该逻辑列所有格子的 row 最大值 + 1
+  var lastColType  = daluCells[daluCells.length - 1].type;
   var maxRow = 0;
   for (var i = daluCells.length - 1; i >= 0; i--) {
     if (daluCells[i].logicCol === lastLogicCol) {
       if (daluCells[i].row > maxRow) maxRow = daluCells[i].row;
-    } else {
-      break;
-    }
+    } else { break; }
   }
   return { type: lastColType, len: maxRow + 1 };
 }
 
-/**
- * 模拟大路追加一个结果(1=庄/2=闲)后，指定衍生路会产生红(true)还是蓝(false)
- * colLens: 当前大路各列长度数组
- * lastType: 当前最后一列的类型(1或2)
- * lastLen:  当前最后一列的长度
- * addType:  即将追加的类型(1或2)
- * offset:   1=大眼路, 2=小路, 3=小强路
- *
- * 规则：
- *   续列(addType===lastType, row=lastLen):
- *     看 当前列(totalCols-1) 往左 offset 列 的 row 和 row-1 是否同状态
- *     hasCur  = (lastLen   < colLens[curColIdx - offset])
- *     hasPrev = (lastLen-1 < colLens[curColIdx - offset])
- *     相同→红，不同→蓝
- *   新列(addType!==lastType, row=0):
- *     比较 len(最后一列) vs len(最后一列 - offset)
- *     相等→红，不等→蓝
- */
+// ── 辅助：从 daluCells 提取庄闲序列（庄='0', 闲='1'，跳过和） ──
+function getDaluSeq(daluCells) {
+  var seq = [];
+  for (var i = 0; i < daluCells.length; i++) {
+    var t = daluCells[i].type;
+    if (t === 1) seq.push('0');
+    else if (t === 2) seq.push('1');
+  }
+  return seq;
+}
+
+// ── 辅助：从衍生路 cells 提取红蓝序列（红='0', 蓝='1'） ──
+function getDerivedSeq(derivedCells) {
+  var seq = [];
+  for (var i = 0; i < derivedCells.length; i++) {
+    seq.push(derivedCells[i].isRed ? '0' : '1');
+  }
+  return seq;
+}
+
+// ── simulateDerivedColor（与 ag-markov.js 完全一致） ──
 function simulateDerivedColor(colLens, lastType, lastLen, addType, offset) {
   var totalCols = colLens.length;
-
   if (addType === lastType) {
-    // ── 续列 ──
-    var curRow     = lastLen;           // 新格的行号(0-based)
-    var curColIdx  = totalCols - 1;     // 当前列索引
-    var checkIdx   = curColIdx - offset;
-    var checkLen   = (checkIdx >= 0 ? colLens[checkIdx] : 0) || 0;
-    var hasCur  = (curRow     < checkLen);
-    var hasPrev = (curRow - 1 < checkLen);
+    var curRow    = lastLen;
+    var checkIdx  = totalCols - 1 - offset;
+    var checkLen  = (checkIdx >= 0 ? colLens[checkIdx] : 0) || 0;
+    var hasCur    = (curRow     < checkLen);
+    var hasPrev   = (curRow - 1 < checkLen);
     return (hasCur === hasPrev);
   } else {
-    // ── 新列 ──
-    // 触发条件：新列索引 = totalCols，需要 totalCols - 1 - offset >= 0
-    if (totalCols - 1 - offset < 0) return true; // 尚未到触发点，默认红
-    var prevLen  = colLens[totalCols - 1] || 0;
-    var refLen   = colLens[totalCols - 1 - offset] || 0;
+    if (totalCols - 1 - offset < 0) return true;
+    var prevLen = colLens[totalCols - 1] || 0;
+    var refLen  = colLens[totalCols - 1 - offset] || 0;
     return (prevLen === refLen);
   }
 }
 
-/**
- * 将4个红蓝预测 bits 逐一反推为庄/闲
- *
- * 语义：bits[i] = 下注 matched 后，matched 追加到大路产生的派生路颜色
- *       找 matched 使得 simulateDerivedColor(cl,lt,ll,matched,offset) === pRed
- *       没中（matched 对立面出现）→ 用对立面更新大路状态再推下一把
- *
- * bits: 字符串如 '0110'，'0'=红，'1'=蓝
- * offset: 1=大眼路, 2=小路, 3=小强路
- */
-function derivedToZhuangXian(bits, colLens, lastType, lastLen, offset) {
-  var result = [];
-  var cl = colLens.slice();
-  var lt = lastType;
-  var ll = lastLen;
-
-  for (var i = 0; i < bits.length; i++) {
-    var predictedRed = (bits[i] === '0');
-
-    // 找 matched：追加 matched 后派生路颜色 = predictedRed
+// ── derivedBitsToZX（与 ag-markov.js 完全一致） ──
+function derivedBitsToZX(predictedBits, colLens, lastColType, lastColLen, gapCols) {
+  var result  = '';
+  var cl      = colLens.slice();
+  var lt      = lastColType;
+  var ll      = lastColLen;
+  for (var i = 0; i < predictedBits.length; i++) {
+    var predictedRed = (predictedBits[i] === '0');
     var matched = 0;
     for (var tryType = 1; tryType <= 2; tryType++) {
-      var genRed = simulateDerivedColor(cl, lt, ll, tryType, offset);
-      if (genRed === predictedRed) { matched = tryType; break; }
+      if (simulateDerivedColor(cl, lt, ll, tryType, gapCols) === predictedRed) {
+        matched = tryType; break;
+      }
     }
-    if (matched === 0) matched = lt; // 兜底
-
-    result.push(matched === 1 ? '庄' : '闲');
-
-    // 没中 → 对立面出现 → 用对立面更新大路状态
+    if (matched === 0) matched = lt;
+    result += (matched === 1) ? '0' : '1';
     var actual = matched === 1 ? 2 : 1;
     if (actual === lt) {
       ll++;
@@ -640,91 +697,137 @@ function derivedToZhuangXian(bits, colLens, lastType, lastLen, offset) {
   return result;
 }
 
-// 锁定的随机bits和庄闲结果，生成一次后不再变
-var _lockedBits = null;
-var _lockedZX   = null;
-// 当前选中的路：1=大眼路, 2=小路, 3=小强路
-var _selectedRoad = 1;
-var _roadNames = { 1: '大眼路', 2: '小路', 3: '小强路' };
+// ── 颜色辅助 ──
+function colorZX(bits) {
+  return bits.split('').map(function(b) {
+    var color = b === '0' ? '#ff4d4f' : '#4da6ff';
+    return '<span style="color:' + color + '">' + b + '</span>';
+  }).join('');
+}
 
-/**
- * 主入口：生成预测并渲染到面板
- */
+function zxLabel(bits) {
+  return '(' + bits.split('').map(function(b) {
+    if (b === '0') return '<span style="color:#ff4d4f">庄</span>';
+    return '<span style="color:#4da6ff">闲</span>';
+  }).join('') + ')';
+}
+
+// ── 锁定缓存：计算一次后固定，直到手动刷新 ──
+var _lockedHTML = null;  // null = 尚未锁定，string = 已锁定的 HTML
+
+function refreshPredict() {
+  _lockedHTML = null;
+  renderPrediction();
+  // 按钮短暂反馈
+  var btn = document.getElementById('predict-refresh');
+  if (btn) {
+    btn.textContent = '✅';
+    setTimeout(function() { btn.textContent = '🔄'; }, 800);
+  }
+}
+
+// 清空路单时同时清掉锁定
+var _origClearAll = clearAll;
+clearAll = function() {
+  _lockedHTML = null;
+  _origClearAll();
+};
+
+// ── 马尔科夫预测主入口 ──
 function renderPrediction() {
   var panel = document.getElementById('prediction-panel');
-  var titleEl = document.getElementById('predict-title');
   if (!panel) return;
 
-  // 更新标题
-  if (titleEl) titleEl.textContent = '🔮 ' + _roadNames[_selectedRoad] + ' 庄闲反推';
+  // 已锁定：直接复用缓存，不重新计算
+  if (_lockedHTML !== null) {
+    panel.innerHTML = _lockedHTML;
+    return;
+  }
 
-  // 过滤掉和局
+  // 过滤掉和局，用非和局数量判断数据是否充足
   var nonTie = results.filter(function(r) { return r !== 3; });
-
   if (nonTie.length < 20) {
-    _lockedBits = null;
-    _lockedZX   = null;
     panel.innerHTML = '<span style="color:#aaa;">（满20局非和局后显示推测）目前 ' + nonTie.length + '/20 局</span>';
     return;
   }
 
-  // 满20局后：只在第一次（或点🎲）时生成并锁定
-  if (_lockedBits === null) {
-    _lockedBits = '';
-    for (var i = 0; i < 4; i++) _lockedBits += (Math.random() < 0.5 ? '0' : '1');
+  // 构建大路 cells，提取列状态
+  var daluCells = buildDaluLayout(results);
+  var colLens   = getDaluColLens(daluCells);
+  var lastCol   = getDaluLastCol(daluCells);
 
-    var daluCells = buildDaluLayout(results);
-    var colLens   = getDaluColLens(daluCells);
-    var lastCol   = getDaluLastCol(daluCells);
-    _lockedZX = derivedToZhuangXian(_lockedBits, colLens, lastCol.type, lastCol.len, _selectedRoad);
-    // 存储快照供调试显示
-    _lockedZX._colLens  = colLens;
-    _lockedZX._lastCol  = lastCol;
-  }
+  // 四条路的序列和配置（与 ag-markov.js 的 roads 数组一致）
+  var dayanziCells   = buildDayanziLayout(daluCells);
+  var xiaoluCells    = buildXiaoluLayout(daluCells);
+  var xiaoqiangCells = buildXiaoqiangLayout(daluCells);
 
-  var bits   = _lockedBits;
-  var zxList = _lockedZX;
-  var colLensSnap = _lockedZX._colLens || [];
-  var lastColSnap = _lockedZX._lastCol || { type: 0, len: 0 };
+  var roads = [
+    { name: '大路',   seq: getDaluSeq(daluCells),       type: 'daLu',    gap: 0 },
+    { name: '大眼仔', seq: getDerivedSeq(dayanziCells),  type: 'derived', gap: 1 },
+    { name: '小路',   seq: getDerivedSeq(xiaoluCells),   type: 'derived', gap: 2 },
+    { name: '小强',   seq: getDerivedSeq(xiaoqiangCells),type: 'derived', gap: 3 }
+  ];
 
-  // 渲染
-  var roadName = _roadNames[_selectedRoad];
-  var html = '<div style="margin-bottom:8px;font-size:11px;color:#888;">' + roadName + ' 随机预测（验证庄闲反推）</div>';
-  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+  var html = '';
+  for (var i = 0; i < roads.length; i++) {
+    var road = roads[i];
+    var top1_o1 = predictTop1Order1(road.seq);
+    var top1_o2 = predictTop1Order2(road.seq);
 
-  for (var j = 0; j < 4; j++) {
-    var rbLabel = bits[j] === '0' ? '红' : '蓝';
-    var rbColor = bits[j] === '0' ? '#e53935' : '#1565c0';
-    var zxLbl   = zxList[j];
-    var zxColor = zxLbl === '庄' ? '#e53935' : '#1565c0';
-    html += '<div style="text-align:center;background:rgba(255,255,255,0.06);border-radius:8px;padding:7px 12px;min-width:52px;">';
-    html += '<div style="font-size:10px;color:#666;margin-bottom:3px;">第' + (j + 1) + '把</div>';
-    html += '<div style="font-size:15px;font-weight:700;color:' + rbColor + ';">' + rbLabel + '</div>';
-    html += '<div style="font-size:11px;color:#555;">↓</div>';
-    html += '<div style="font-size:15px;font-weight:700;color:' + zxColor + ';">' + zxLbl + '</div>';
+    // 反推为庄闲（大路直接用 bits，下三路用 derivedBitsToZX）
+    var o1ZX = null, o2ZX = null;
+    if (top1_o1) {
+      o1ZX = (road.type === 'daLu')
+        ? top1_o1.bits
+        : derivedBitsToZX(top1_o1.bits, colLens, lastCol.type, lastCol.len, road.gap);
+    }
+    if (top1_o2) {
+      o2ZX = (road.type === 'daLu')
+        ? top1_o2.bits
+        : derivedBitsToZX(top1_o2.bits, colLens, lastCol.type, lastCol.len, road.gap);
+    }
+
+    // 一致性标记
+    var consensus = (o1ZX && o2ZX && o1ZX === o2ZX)
+      ? '<span style="font-size:9px;color:#34d399;margin-left:4px;">✅</span>' : '';
+
+    html += '<div style="padding:5px 0;border-bottom:1px solid rgba(42,42,74,0.6);">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
+    html += '<span style="font-size:11px;color:#818cf8;font-weight:600;">' + road.name + consensus + '</span>';
+    html += '</div>';
+
+    // 一阶
+    if (top1_o1) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
+      html += '<span style="font-size:10px;color:#6b6b8a;">1阶</span>';
+      html += '<span>';
+      html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(top1_o1.bits) + '</span>';
+      html += '<span style="font-size:9px;margin-left:3px;">' + (o1ZX ? zxLabel(o1ZX) : '') + '</span>';
+      html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o1.p * 100).toFixed(2) + '%</span>';
+      html += '</span></div>';
+    } else {
+      html += '<div style="padding-left:8px;font-size:10px;color:#6b6b8a;">1阶 数据不足</div>';
+    }
+
+    // 二阶
+    if (top1_o2) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-left:8px;">';
+      html += '<span style="font-size:10px;color:#6b6b8a;">2阶</span>';
+      html += '<span>';
+      html += '<span style="font-family:Courier New,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;">' + colorZX(top1_o2.bits) + '</span>';
+      html += '<span style="font-size:9px;margin-left:3px;">' + (o2ZX ? zxLabel(o2ZX) : '') + '</span>';
+      html += '<span style="font-size:10px;color:#34d399;margin-left:5px;">' + (top1_o2.p * 100).toFixed(2) + '%</span>';
+      html += '</span></div>';
+    } else {
+      html += '<div style="padding-left:8px;font-size:10px;color:#6b6b8a;">2阶 数据不足</div>';
+    }
+
     html += '</div>';
   }
 
-  html += '</div>';
-  html += '<div style="margin-top:8px;font-size:10px;color:#555;">bits: ' + bits + '　末列: ' + (lastColSnap.type === 1 ? '庄' : '闲') + 'x' + lastColSnap.len + '</div>';
-
+  // 首次计算完毕，锁定结果
+  _lockedHTML = html;
   panel.innerHTML = html;
-}
-
-// 切换路
-function selectRoad(offset) {
-  _selectedRoad = offset;
-  // 切换路时重置锁定，重新计算
-  _lockedBits = null;
-  _lockedZX   = null;
-  // 更新按钮高亮
-  [1, 2, 3].forEach(function(o) {
-    var btn = document.getElementById('road-btn-' + o);
-    if (!btn) return;
-    btn.style.background  = (o === offset) ? '#7c3aed' : 'rgba(124,58,237,0.2)';
-    btn.style.color       = (o === offset) ? '#fff'    : '#c4b5fd';
-  });
-  renderPrediction();
 }
 
 // 重写 render，追加调用预测
@@ -734,13 +837,6 @@ render = function() {
   renderPrediction();
 };
 
-// 重新随机：清掉锁定，重新生成
-function reRandomPredict() {
-  _lockedBits = null;
-  _lockedZX   = null;
-  renderPrediction();
-}
-
 // 悬浮窗拖动 + 收起
 document.addEventListener('DOMContentLoaded', function() {
   var panel  = document.getElementById('predict-float');
@@ -749,7 +845,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var toggle = document.getElementById('predict-toggle');
   if (!panel || !header) return;
 
-  // 拖动
   var dragging = false, ox = 0, oy = 0;
   header.addEventListener('mousedown', function(e) {
     if (e.target.tagName === 'BUTTON' || e.target.id === 'predict-toggle') return;
@@ -767,37 +862,28 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   document.addEventListener('mouseup', function() { dragging = false; });
 
-  // 收起/展开（同时隐藏/显示路选择器和内容区）
   toggle.addEventListener('click', function() {
     var collapsed = body.style.display === 'none';
-    var selector  = document.getElementById('predict-road-selector');
-    body.style.display              = collapsed ? '' : 'none';
-    if (selector) selector.style.display = collapsed ? '' : 'none';
-    toggle.textContent  = collapsed ? '—' : '＋';
+    body.style.display = collapsed ? '' : 'none';
+    toggle.textContent = collapsed ? '—' : '＋';
   });
 });
 
 render();
 </script>
 
-<!-- 【新增】悬浮预测面板 -->
-<div id="predict-float" style="position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(15,15,26,0.96);border:2px solid #7c3aed;border-radius:12px;width:270px;box-shadow:0 4px 24px rgba(124,58,237,0.5);font-family:'Microsoft YaHei','Segoe UI',sans-serif;user-select:none;">
+<!-- 马尔科夫预测悬浮面板 -->
+<div id="predict-float" style="position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(15,15,26,0.95);border:2px solid #7c3aed;border-radius:10px;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:13px;color:#e0e0f0;min-width:260px;box-shadow:0 4px 20px rgba(124,58,237,0.4);user-select:none;">
   <!-- 标题栏（可拖动） -->
   <div id="predict-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(124,58,237,0.2);border-radius:10px 10px 0 0;cursor:move;">
-    <span id="predict-title" style="color:#c4b5fd;font-weight:700;font-size:13px;">🔮 大眼路 庄闲反推</span>
+    <span style="color:#c4b5fd;font-weight:700;font-size:13px;">🔮 马尔科夫预测</span>
     <div style="display:flex;gap:6px;align-items:center;">
-      <button onclick="reRandomPredict()" title="重新随机" style="padding:2px 8px;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;">🎲</button>
+      <button id="predict-refresh" onclick="refreshPredict()" title="重新预测（解除锁定）" style="padding:2px 8px;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;">🔄</button>
       <span id="predict-toggle" style="cursor:pointer;font-size:15px;color:#c4b5fd;line-height:1;" title="收起/展开">—</span>
     </div>
   </div>
-  <!-- 路选择器 -->
-  <div id="predict-road-selector" style="display:flex;gap:6px;padding:8px 12px 4px;border-bottom:1px solid rgba(124,58,237,0.25);">
-    <button id="road-btn-1" onclick="selectRoad(1)" style="flex:1;padding:4px 0;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">大眼路</button>
-    <button id="road-btn-2" onclick="selectRoad(2)" style="flex:1;padding:4px 0;background:rgba(124,58,237,0.2);color:#c4b5fd;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">小路</button>
-    <button id="road-btn-3" onclick="selectRoad(3)" style="flex:1;padding:4px 0;background:rgba(124,58,237,0.2);color:#c4b5fd;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">小强路</button>
-  </div>
   <!-- 内容区 -->
-  <div id="predict-body" style="padding:12px;">
+  <div id="predict-body" style="padding:10px 12px;">
     <div id="prediction-panel" style="color:#e0e0f0;font-size:12px;">
       （满20局非和局后显示）目前 0/20 局
     </div>
