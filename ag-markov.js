@@ -147,20 +147,35 @@
       .map(function(b) { return b.winType === 1 ? '0' : '1'; });
   }
 
-  function getColLens(daLuData) {
-    var colLens = [];
-    if (!daLuData) return colLens;
-    for (var c = 0; c < daLuData.length; c++) {
-      var col = daLuData[c];
-      var count = 0;
-      if (Array.isArray(col)) {
-        for (var r = 0; r < col.length; r++) {
-          if (col[r].winType === 1 || col[r].winType === 2) count++;
-        }
+  // 从 daLuProto（时间顺序扁平序列）计算逻辑列信息
+  // 绕开 daLuData 物理坐标的拐角问题：拐角格子和原列共用 colIndex，
+  // 用 daLuProto 按出牌顺序模拟，完全无坐标，不受拐角影响
+  function getColInfoFromProto(daLuProto) {
+    var colLens   = [];
+    var lastType  = 0;
+    if (!daLuProto) return { colLens: colLens, lastColType: 0, lastColLen: 0 };
+
+    var flat = Array.isArray(daLuProto[0]) ? daLuProto.flat() : daLuProto;
+    for (var i = 0; i < flat.length; i++) {
+      var t = flat[i].winType;
+      if (t !== 1 && t !== 2) continue; // 跳过和局、空格
+
+      if (lastType === 0) {
+        colLens.push(1);
+        lastType = t;
+      } else if (t === lastType) {
+        colLens[colLens.length - 1]++;  // 同色续列
+      } else {
+        colLens.push(1);                // 换色新列
+        lastType = t;
       }
-      colLens.push(count);
     }
-    return colLens;
+
+    return {
+      colLens:     colLens,
+      lastColType: lastType,
+      lastColLen:  colLens.length > 0 ? colLens[colLens.length - 1] : 0
+    };
   }
 
   function getRoadData() {
@@ -173,24 +188,8 @@
     var vid = '\u672A\u77E5';
     try { vid = GameBac.RoadMapStore._instance.indexStore.validVidList[0] || '\u672A\u77E5'; } catch(e) {}
 
-    // 大路列结构信息
-    var colLens = getColLens(rd.daLuData);
-    var lastColType = 0; // 最后一列的类型 1=庄 2=闲
-    var lastColLen = 0;
-    if (rd.daLuData && rd.daLuData.length > 0) {
-      for (var c = rd.daLuData.length - 1; c >= 0; c--) {
-        var col = rd.daLuData[c];
-        if (Array.isArray(col)) {
-          for (var r = 0; r < col.length; r++) {
-            if (col[r].winType === 1 || col[r].winType === 2) {
-              if (lastColType === 0) lastColType = col[r].winType;
-              lastColLen++;
-            }
-          }
-          if (lastColLen > 0) break;
-        }
-      }
-    }
+    // 从 daLuProto 计算逻辑列信息，绕开 daLuData 拐角坐标问题
+    var colInfo = getColInfoFromProto(rd.daLuProto);
 
     return {
       vid: vid,
@@ -199,9 +198,9 @@
       daYan: toSequence(rd.daYanLuData),
       xiaoLu: toSequence(rd.xiaoLuData),
       xiaoQiang: toSequence(rd.xiaoQiangLuData),
-      colLens: colLens,
-      lastColType: lastColType, // 1=庄 2=闲
-      lastColLen: lastColLen    // 当前最后一列的长度
+      colLens:     colInfo.colLens,
+      lastColType: colInfo.lastColType, // 1=庄 2=闲
+      lastColLen:  colInfo.lastColLen   // 当前最后一列的长度
     };
   }
 
