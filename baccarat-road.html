@@ -242,14 +242,17 @@ var DAYANZI_ROWS = 6;
 var DAYANZI_COLS = 70;
 
 // ────────────────────────────────────────────────
-// 大路布局算法（无拐角版）
-// 同色无限往下延伸，换色才换列从第1行开始。
-// col == logicCol（两者相同，保留 logicCol 字段供下三路使用）
+// 大路布局算法（6行拐角版，与真实游戏一致）
+// 同色先往下走，满6行后往右拐继续；换色才换逻辑列从第0行开始。
+// logicCol: 逻辑列编号（供下三路算法使用）
+// col/row:  物理坐标（供渲染使用）
 // ────────────────────────────────────────────────
 function buildDaluLayout(results) {
-  var cells = [];
-  var col = 0;
-  var row = 0;
+  var cells    = [];
+  var logicCol = 0;  // 逻辑列（换色时+1）
+  var physCol  = 0;  // 物理列（拐角时也+1）
+  var physRow  = 0;  // 物理行（0~5，满6后向右拐）
+  var logicRow = 0;  // 逻辑行（列内第几格，供下三路用）
   var lastType = 0;
 
   for (var i = 0; i < results.length; i++) {
@@ -264,15 +267,33 @@ function buildDaluLayout(results) {
     }
 
     if (lastType === 0) {
-      col = 0; row = 0;
+      // 第一格
+      logicCol = 0; physCol = 0; physRow = 0; logicRow = 0;
     } else if (t === lastType) {
-      row++; // 同色：继续往下，无限延伸
+      // 同色：先往下，满6行后往右拐
+      logicRow++;
+      if (physRow < 5) {
+        physRow++;        // 还没满，继续往下
+      } else {
+        physCol++;        // 满6行，往右拐一列，行号保持在5
+        // physRow 保持5不变（拐角行永远在第5行继续向右）
+      }
     } else {
-      col++; row = 0; // 换色：新列，从第1行开始
+      // 换色：新逻辑列，从第0行开始
+      logicCol++;
+      physCol++;
+      physRow  = 0;
+      logicRow = 0;
     }
 
-    // col 即为逻辑列（无拐角，物理列==逻辑列）
-    cells.push({ col: col, row: row, type: t, hePlus: 0, logicCol: col });
+    cells.push({
+      col:      physCol,
+      row:      physRow,
+      type:     t,
+      hePlus:   0,
+      logicCol: logicCol,
+      logicRow: logicRow  // 列内第几格（下三路用这个作为 r）
+    });
     lastType = t;
   }
 
@@ -324,7 +345,7 @@ function buildDerivedRoad(daluCells, offset, skipFirstRow) {
   for (var i = 0; i < daluCells.length; i++) {
     var cell = daluCells[i];
     var c = cell.logicCol;
-    var r = cell.row;
+    var r = cell.logicRow !== undefined ? cell.logicRow : cell.row; // 用逻辑行，兼容旧数据
 
     // 先更新大路列长（此格生成前的状态作为判断依据，所以在判断后再更新）
     // 实际上新列(r=0)时 colLens[c] 应为0（本列第一格），续列时已有值
@@ -608,10 +629,10 @@ function predictTop1Order2(seq) {
 function getDaluColLens(daluCells) {
   var colLens = [];
   for (var i = 0; i < daluCells.length; i++) {
-    var c = daluCells[i].logicCol;
-    var r = daluCells[i].row;
+    var c  = daluCells[i].logicCol;
+    var lr = daluCells[i].logicRow !== undefined ? daluCells[i].logicRow : daluCells[i].row;
     while (colLens.length <= c) colLens.push(0);
-    if (r + 1 > colLens[c]) colLens[c] = r + 1;
+    if (lr + 1 > colLens[c]) colLens[c] = lr + 1;
   }
   return colLens;
 }
@@ -624,7 +645,8 @@ function getDaluLastCol(daluCells) {
   var maxRow = 0;
   for (var i = daluCells.length - 1; i >= 0; i--) {
     if (daluCells[i].logicCol === lastLogicCol) {
-      if (daluCells[i].row > maxRow) maxRow = daluCells[i].row;
+      var lr = daluCells[i].logicRow !== undefined ? daluCells[i].logicRow : daluCells[i].row;
+      if (lr > maxRow) maxRow = lr;
     } else { break; }
   }
   return { type: lastColType, len: maxRow + 1 };
