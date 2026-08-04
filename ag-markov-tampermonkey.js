@@ -8,6 +8,8 @@
 // @match        *://*.iunnc.com/*
 // @run-at       document-idle
 // @grant        unsafeWindow
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
 // ============================================================
@@ -78,9 +80,7 @@
   openCalcWin();
 
   // ── 每日计算额度 ──────────────────────────────
-  var DAILY_LIMIT       = 60;
-  var STORAGE_KEY_COUNT = 'mk_daily_count';
-  var STORAGE_KEY_DATE  = 'mk_daily_date';
+  var DAILY_LIMIT = 60;
 
   function getTodayStr() {
     var d = new Date();
@@ -88,16 +88,16 @@
   }
   function getDailyUsed() {
     var today = getTodayStr();
-    if (W.localStorage.getItem(STORAGE_KEY_DATE) !== today) {
-      W.localStorage.setItem(STORAGE_KEY_DATE, today);
-      W.localStorage.setItem(STORAGE_KEY_COUNT, '0');
+    if (GM_getValue('mk_date', '') !== today) {
+      GM_setValue('mk_date', today);
+      GM_setValue('mk_count', 0);
       return 0;
     }
-    return parseInt(W.localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
+    return GM_getValue('mk_count', 0);
   }
   function addDailyUsed() {
     var next = getDailyUsed() + 1;
-    W.localStorage.setItem(STORAGE_KEY_COUNT, String(next));
+    GM_setValue('mk_count', next);
     return next;
   }
   function isLimitReached() { return getDailyUsed() >= DAILY_LIMIT; }
@@ -213,17 +213,17 @@
 
   // ── 主循环 ──────────────────────────────────────
   var _lastVid = null;
-  try { _lastVid = W.sessionStorage.getItem('mk_session_vid') || null; } catch(e){}
+  try { _lastVid = GM_getValue('mk_session_vid', null) || null; } catch(e){}
 
   function computeAndPublish() {
     var data = getRoadData();
     var vid  = data ? data.vid : null;
 
     if (!vid || vid==='未知') {
-      if (_lastVid) { _lastVid=null; try{W.sessionStorage.removeItem('mk_session_vid');}catch(e){} }
+      if (_lastVid) { _lastVid=null; try{ GM_setValue('mk_session_vid', ''); }catch(e){} }
     } else if (vid !== _lastVid) {
       _lastVid = vid;
-      try{W.sessionStorage.setItem('mk_session_vid', vid);}catch(e){}
+      try{ GM_setValue('mk_session_vid', vid); }catch(e){}
       addDailyUsed();
     }
 
