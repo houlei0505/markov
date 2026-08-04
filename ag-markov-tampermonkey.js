@@ -13,10 +13,33 @@
 // @connect      houlei0505.github.io
 // ==/UserScript==
 
+// ============================================================
+// 【每次更新计算逻辑的操作步骤】
+//
+// 1. 修改 E:\win\ag-markov.js 里的计算代码
+//
+// 2. 把下面的 REMOTE_VER 版本号递增（如 '2.5' → '2.6'）
+//    ★ 这一步是触发自动拉取的开关，不改版本号不会生效 ★
+//
+// 3. 推送到 GitHub：
+//    git add ag-markov.js ag-markov-tampermonkey.js
+//    git commit -m "你的描述"
+//    git push origin main
+//
+// 4. 在 Tampermonkey 里重新安装/粘贴本文件（因为版本号改了）
+//    → 下次刷新百家乐页面，脚本自动拉取新版 ag-markov.js 并缓存
+//    → 之后刷新都走缓存，零网络请求，直到下次再改版本号
+//
+// 【指挥中心 calc.html 使用方式】
+//    双击打开 E:\win\calc.html（本地 file:// 协议，不需要部署）
+//    与百家乐标签页通过 BroadcastChannel 实时通信，3秒刷新一次
+//    calc.html 不推 GitHub（纯本地工具，推了也没用）
+// ============================================================
+
 (function() {
   'use strict';
 
-  // 版本号：与 GitHub 上的 ag-markov.js 保持同步，不同则拉取新版本
+  // ★ 修改计算逻辑后，把这里的版本号递增，才会触发重新拉取 ★
   var REMOTE_VER = '2.5';
   var SCRIPT_URL = 'https://houlei0505.github.io/markov/ag-markov.js';
 
