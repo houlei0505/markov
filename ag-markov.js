@@ -9,29 +9,33 @@
 //   里的 REMOTE_VER 版本号（两个文件要对得上），否则油猴不会
 //   重新拉取，用户看到的还是旧版缓存。
 //
-//   当前版本：2.5
+//   当前版本：2.6
 //   修改历史：
+//     2.6 - 修复unsafeWindow沙盒问题，用__win__访问GameBac和BroadcastChannel
 //     2.5 - 零DOM模式，BroadcastChannel通信，calc.html指挥中心
 //     2.4 - 修复大路拐角colLens统计（改用daLuProto）
 //     2.3 - 新增二阶马尔科夫、派生路庄闲转换
 // ============================================================
 
-(function() {
+(function(__win__) {
   'use strict';
 
-  // 防重复执行标志，用随机 key 避免被扫描到固定特征
-  var _MK_FLAG = '__mk_' + (typeof btoa !== 'undefined' ? btoa('loaded').replace(/=/g,'') : 'x9k2');
-  if (window[_MK_FLAG]) return;
-  window[_MK_FLAG] = true;
+  // __win__ = 网页真实 window（由 tampermonkey.js 的 unsafeWindow 传入）
+  // 必须用 __win__ 访问 GameBac 等游戏对象，用 __win__.BroadcastChannel 确保跨标签页通信
+
+  // 防重复执行标志
+  var _MK_FLAG = '__mk_' + (typeof __win__.btoa !== 'undefined' ? __win__.btoa('loaded').replace(/=/g,'') : 'x9k2');
+  if (__win__[_MK_FLAG]) return;
+  __win__[_MK_FLAG] = true;
 
   // ── 配置 ──────────────────────────────────────
   var PREDICT_LEN   = 4;
   var POLL_INTERVAL = 3000;
   var pollTimer     = null;
 
-  // BroadcastChannel 跨标签页通信（不受域名隔离限制）
+  // BroadcastChannel 跨标签页通信（用真实 window 的，确保跨标签页可达）
   var bc = null;
-  try { bc = new BroadcastChannel('mk_channel'); } catch(e) {}
+  try { bc = new __win__.BroadcastChannel('mk_channel'); } catch(e) {}
 
   // localStorage 通信 key（同域备用，兼容不支持 BroadcastChannel 的情况）
   var LS_KEY_DATA  = 'mk_road_data';
@@ -49,19 +53,19 @@
 
   function getDailyUsed() {
     var today = getTodayStr();
-    var savedDate = localStorage.getItem(STORAGE_KEY_DATE);
+    var savedDate = __win__.localStorage.getItem(STORAGE_KEY_DATE);
     if (savedDate !== today) {
-      localStorage.setItem(STORAGE_KEY_DATE, today);
-      localStorage.setItem(STORAGE_KEY_COUNT, '0');
+      __win__.localStorage.setItem(STORAGE_KEY_DATE, today);
+      __win__.localStorage.setItem(STORAGE_KEY_COUNT, '0');
       return 0;
     }
-    return parseInt(localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
+    return parseInt(__win__.localStorage.getItem(STORAGE_KEY_COUNT) || '0', 10);
   }
 
   function addDailyUsed() {
     var cur = getDailyUsed();
     var next = cur + 1;
-    localStorage.setItem(STORAGE_KEY_COUNT, String(next));
+    __win__.localStorage.setItem(STORAGE_KEY_COUNT, String(next));
     return next;
   }
 
@@ -180,13 +184,13 @@
   }
 
   function getRoadData() {
-    if (!window.GameBac) return null;
-    if (!GameBac.RoadMapStore) return null;
-    if (!GameBac.RoadMapStore._instance) return null;
-    var rd = GameBac.RoadMapStore._instance.roadData;
+    if (!__win__.GameBac) return null;
+    if (!__win__.GameBac.RoadMapStore) return null;
+    if (!__win__.GameBac.RoadMapStore._instance) return null;
+    var rd = __win__.GameBac.RoadMapStore._instance.roadData;
     if (!rd) return null;
     var vid = '未知';
-    try { vid = GameBac.RoadMapStore._instance.indexStore.validVidList[0] || '未知'; } catch(e) {}
+    try { vid = __win__.GameBac.RoadMapStore._instance.indexStore.validVidList[0] || '未知'; } catch(e) {}
     var colInfo = getColInfoFromProto(rd.daLuProto);
     return {
       vid: vid,
@@ -245,7 +249,7 @@
   }
 
   // ── 计算并写入 localStorage ───────────────────
-  var _lastVid = sessionStorage.getItem('mk_session_vid') || null;
+  var _lastVid = __win__.sessionStorage.getItem('mk_session_vid') || null;
 
   function computeAndPublish() {
     var data = getRoadData();
@@ -255,11 +259,11 @@
     if (!currentVid || currentVid === '未知') {
       if (_lastVid) {
         _lastVid = null;
-        sessionStorage.removeItem('mk_session_vid');
+        __win__.sessionStorage.removeItem('mk_session_vid');
       }
     } else if (currentVid !== _lastVid) {
       _lastVid = currentVid;
-      sessionStorage.setItem('mk_session_vid', currentVid);
+      __win__.sessionStorage.setItem('mk_session_vid', currentVid);
       addDailyUsed();
     }
 
@@ -308,8 +312,8 @@
     }
     // 同时写 localStorage 作为兜底（同域情况）
     try {
-      localStorage.setItem(LS_KEY_DATA, JSON.stringify(payload));
-      localStorage.setItem(LS_KEY_PING, String(Date.now()));
+      __win__.localStorage.setItem(LS_KEY_DATA, JSON.stringify(payload));
+      __win__.localStorage.setItem(LS_KEY_PING, String(Date.now()));
     } catch(e) {}
   }
 
@@ -326,9 +330,9 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { setTimeout(tryStart, 500); });
+    __win__.document.addEventListener('DOMContentLoaded', function() { setTimeout(tryStart, 500); });
   } else {
     setTimeout(tryStart, 500);
   }
 
-})();
+});

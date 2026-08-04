@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AG 马尔科夫路单分析
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  无痕沙盒热加载 - 使用扩展底层请求，不修改任何 DOM 节点
 // @author       You
 // @match        *://gci.iunnc.com/*
@@ -10,6 +10,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        unsafeWindow
 // @connect      houlei0505.github.io
 // ==/UserScript==
 
@@ -40,16 +41,21 @@
   'use strict';
 
   // ★ 修改计算逻辑后，把这里的版本号递增，才会触发重新拉取 ★
-  var REMOTE_VER = '2.5';
+  var REMOTE_VER = '2.6';
   var SCRIPT_URL = 'https://houlei0505.github.io/markov/ag-markov.js';
+
+  // unsafeWindow = 网页真实的 window（能访问 GameBac 等游戏对象）
+  // Tampermonkey 沙盒的 window 访问不到游戏内部变量
+  var realWindow = unsafeWindow;
 
   var cachedVer  = GM_getValue('mk_script_ver', '');
   var cachedCode = GM_getValue('mk_script_code', '');
 
   function runCode(code) {
     try {
-      // 用 Function 构造器在独立作用域执行，不污染 window
-      (new Function(code))();
+      // 把真实 window 作为参数传入，让 ag-markov.js 能访问 GameBac 等游戏对象
+      // 同时 BroadcastChannel 也用真实 window 的，确保跨标签页通信正常
+      (new Function('__win__', code))(realWindow);
     } catch(e) {
       console.error('[MK] 执行错误:', e);
     }
@@ -57,10 +63,11 @@
 
   if (cachedVer === REMOTE_VER && cachedCode) {
     // 版本一致，直接用缓存，零网络请求
+    console.log('[MK] 使用缓存版本 ' + REMOTE_VER);
     runCode(cachedCode);
   } else {
     // 版本不一致，静默拉取新版本
-    // GM_xmlhttpRequest 从扩展层发出，目标网页 fetch/XHR 劫持抓不到，也不受 CSP 限制
+    console.log('[MK] 拉取新版本 ' + REMOTE_VER + '...');
     GM_xmlhttpRequest({
       method: 'GET',
       url: SCRIPT_URL + '?v=' + REMOTE_VER,
@@ -68,10 +75,10 @@
         if (res.status === 200) {
           GM_setValue('mk_script_code', res.responseText);
           GM_setValue('mk_script_ver', REMOTE_VER);
+          console.log('[MK] 拉取成功，开始执行');
           runCode(res.responseText);
         } else {
           console.error('[MK] 拉取失败，状态码:', res.status);
-          // 降级：用旧缓存
           if (cachedCode) runCode(cachedCode);
         }
       },
