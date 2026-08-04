@@ -34,22 +34,9 @@
   #conn-indicator.offline { background: #f87171; }
   #conn-indicator.waiting { background: #fbbf24; }
 
-  /* ── 诊断面板 ── */
-  #diag-box {
-    background: rgba(15,23,42,0.9);
-    border: 1px solid rgba(100,116,139,0.4);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    font-size: 11px;
-    line-height: 1.8;
-  }
-  #diag-box summary {
-    cursor: pointer;
-    color: #64748b;
-    user-select: none;
-    font-size: 11px;
-  }
+  /* ── 诊断面板样式（注释掉，排查时取消）
+  #diag-box { background: rgba(15,23,42,0.9); border: 1px solid rgba(100,116,139,0.4); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 11px; line-height: 1.8; }
+  #diag-box summary { cursor: pointer; color: #64748b; user-select: none; font-size: 11px; }
   #diag-box summary:hover { color: #94a3b8; }
   .diag-row { display: flex; justify-content: space-between; gap: 8px; }
   .diag-label { color: #475569; flex-shrink: 0; }
@@ -57,20 +44,12 @@
   .diag-ok    { color: #34d399; }
   .diag-warn  { color: #fbbf24; }
   .diag-err   { color: #f87171; }
-  #diag-log {
-    margin-top: 6px;
-    max-height: 120px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 10px;
-    color: #475569;
-    border-top: 1px solid rgba(100,116,139,0.2);
-    padding-top: 4px;
-  }
+  #diag-log { margin-top: 6px; max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 10px; color: #475569; border-top: 1px solid rgba(100,116,139,0.2); padding-top: 4px; }
   #diag-log div { padding: 1px 0; }
   #diag-log div.ok   { color: #34d399; }
   #diag-log div.warn { color: #fbbf24; }
   #diag-log div.err  { color: #f87171; }
+  */
 
   /* ── 状态栏 ── */
   #status-bar {
@@ -156,9 +135,9 @@
   🔮 马尔科夫预测面板
 </h1>
 
-<!-- ── 诊断面板 ── -->
-<details id="diag-box" open>
-  <summary>🔧 诊断信息（排查问题用，正常运行后可折叠）</summary>
+<!-- 诊断面板（注释掉，排查时取消）
+<details id="diag-box">
+  <summary>🔧 诊断信息（点击展开）</summary>
   <div style="margin-top:8px;">
     <div class="diag-row"><span class="diag-label">本页协议</span><span class="diag-val" id="d-protocol">-</span></div>
     <div class="diag-row"><span class="diag-label">通信方式</span><span class="diag-val" id="d-bc">-</span></div>
@@ -169,6 +148,7 @@
   </div>
   <div id="diag-log"></div>
 </details>
+-->
 
 <div id="status-bar">
   <span id="room-info">等待百家乐页面数据...</span>
@@ -220,64 +200,55 @@
   var snapContent = document.getElementById('snap-content');
   var snapTime    = document.getElementById('snap-time');
 
-  // ── 诊断 refs ──
-  var dProtocol = document.getElementById('d-protocol');
-  var dBc       = document.getElementById('d-bc');
-  var dMsgCount = document.getElementById('d-msgcount');
-  var dLastMsg  = document.getElementById('d-lastmsg');
-  var dVid      = document.getElementById('d-vid');
-  var dRaw      = document.getElementById('d-raw');
-  var dLog      = document.getElementById('diag-log');
+  // 诊断 refs（注释掉，排查时取消）
+  // var dProtocol = document.getElementById('d-protocol');
+  // var dBc       = document.getElementById('d-bc');
+  // var dMsgCount = document.getElementById('d-msgcount');
+  // var dLastMsg  = document.getElementById('d-lastmsg');
+  // var dVid      = document.getElementById('d-vid');
+  // var dRaw      = document.getElementById('d-raw');
+  // var dLog      = document.getElementById('diag-log');
 
-  function log(msg, type) {
-    var d = new Date();
-    var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
-    var div = document.createElement('div');
-    div.className = type || '';
-    div.textContent = '[' + ts + '] ' + msg;
-    dLog.insertBefore(div, dLog.firstChild);
-    // 最多保留30条
-    while (dLog.children.length > 30) dLog.removeChild(dLog.lastChild);
-  }
+  // 诊断日志函数（注释掉，排查时取消）
+  // function log(msg, type) {
+  //   var d = new Date();
+  //   var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+  //   var div = document.createElement('div');
+  //   div.className = type || '';
+  //   div.textContent = '[' + ts + '] ' + msg;
+  //   dLog.insertBefore(div, dLog.firstChild);
+  //   while (dLog.children.length > 30) dLog.removeChild(dLog.lastChild);
+  // }
 
-  // ── 显示本页协议 ──
-  dProtocol.textContent = window.location.protocol + '//' + (window.location.hostname || 'file');
-  log('页面加载，协议: ' + window.location.protocol);
+  // 诊断初始化（注释掉，排查时取消）
+  // dProtocol.textContent = window.location.protocol + '//' + (window.location.hostname || 'file');
+  // dBc.textContent = '✅ 监听 postMessage（跨域模式）';
+  // dBc.className = 'diag-val diag-ok';
 
-  // ── postMessage 接收（油猴脚本通过 window.open 打开本页，用 postMessage 跨域发数据）──
-  // BroadcastChannel 受同源限制，跨域无效；改用 postMessage 彻底解决跨域问题。
-  dBc.textContent = '✅ 监听 postMessage（跨域模式）';
-  dBc.className = 'diag-val diag-ok';
-  log('postMessage 监听已注册', 'ok');
-
+  // ── postMessage 接收 ──
   window.addEventListener('message', function(e) {
     // 只接受带 predictions 字段的数据，过滤无关消息
     if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
 
     msgCount++;
     lastPingTs = Date.now();
-    dMsgCount.textContent = msgCount;
-    var d = new Date();
-    dLastMsg.textContent = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
-    dLastMsg.className = 'diag-val diag-ok';
 
-    var raw = JSON.stringify(e.data).substring(0, 80) + '...';
-    dRaw.textContent = raw;
-    if (e.data.vid) {
-      dVid.textContent = e.data.vid;
-      dVid.className = 'diag-val diag-ok';
-    }
+    // 诊断更新（注释掉，排查时取消）
+    // dMsgCount.textContent = msgCount;
+    // var dd = new Date();
+    // dLastMsg.textContent = [dd.getHours(),dd.getMinutes(),dd.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+    // dLastMsg.className = 'diag-val diag-ok';
+    // dRaw.textContent = JSON.stringify(e.data).substring(0, 80) + '...';
+    // if (e.data.vid) { dVid.textContent = e.data.vid; dVid.className = 'diag-val diag-ok'; }
 
-    log('收到消息 #' + msgCount + ' 来源=' + e.origin + ' vid=' + (e.data.vid || '大厅'), 'ok');
     setOnline(true);
-    try { render(e.data); } catch(ex) { log('render错误: ' + ex.message, 'err'); }
+    try { render(e.data); } catch(ex) {}
   });
 
   // ── 在线状态检测 ──
   setInterval(function() {
     if (lastPingTs && Date.now() - lastPingTs > OFFLINE_TIMEOUT) {
       setOnline(false);
-      log('超过10秒无消息，标记为离线', 'warn');
     }
   }, 3000);
 
@@ -414,8 +385,6 @@
       btn.style.background = 'linear-gradient(135deg,#ea580c,#c2410c)';
     }, 1200);
   });
-
-  log('页面初始化完成，等待 BroadcastChannel 消息...', 'warn');
 
 })();
 </script>
