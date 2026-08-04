@@ -35,11 +35,6 @@
   // unsafeWindow = 百家乐页面真实的 window，能访问 GameBac 等游戏对象
   var W = unsafeWindow;
 
-  // ── 防重复执行（用 unsafeWindow 上的 Symbol 隔离，不污染普通属性）──
-  var _MK_KEY = '__mk__';
-  if (W[_MK_KEY]) return;
-  W[_MK_KEY] = 1;
-
   // ── 配置 ────────────────────────────────────────
   var PREDICT_LEN   = 4;
   var POLL_INTERVAL = 3000;
