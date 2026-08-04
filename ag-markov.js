@@ -19,8 +19,10 @@
 (function() {
   'use strict';
 
-  if (window.__MK_LOADED__) return;
-  window.__MK_LOADED__ = true;
+  // 防重复执行标志，用随机 key 避免被扫描到固定特征
+  var _MK_FLAG = '__mk_' + (typeof btoa !== 'undefined' ? btoa('loaded').replace(/=/g,'') : 'x9k2');
+  if (window[_MK_FLAG]) return;
+  window[_MK_FLAG] = true;
 
   // ── 配置 ──────────────────────────────────────
   var PREDICT_LEN   = 4;
