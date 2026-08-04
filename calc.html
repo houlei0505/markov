@@ -372,24 +372,42 @@
       return;
     }
     var btn = this;
-    var html = '';
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
     var ps = currentPayload.predictions;
     for (var i = 0; i < ps.length; i++) {
       var p = ps[i];
-      html += '<div style="margin-bottom:6px;"><b style="color:#818cf8;">' + escHtml(p.name) + '</b>';
-      if (p.consensus) html += ' <span style="color:#34d399;font-size:10px;">✅</span>';
+      // 每条路做一个小卡片，2列布局
+      html += '<div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,' + (p.consensus?'0.6':'0.2') + ');border-radius:7px;padding:5px 8px;">';
+      // 标题行
+      html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">';
+      html += '<span style="font-size:11px;font-weight:700;color:#818cf8;">' + escHtml(p.name) + '</span>';
+      if (p.consensus) html += '<span style="font-size:9px;color:#34d399;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);border-radius:3px;padding:0 3px;">一致</span>';
+      html += '</div>';
+      // 1阶行
+      html += '<div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-top:1px solid rgba(42,42,74,0.5);">';
+      html += '<span style="font-size:9px;color:#6b6b8a;min-width:18px;">1阶</span>';
       if (p.o1) {
-        html += ' <span style="font-size:11px;color:#94a3b8;">1阶:</span> <span style="font-family:monospace;">' + renderBits(p.o1.bits) + '</span>';
-        if (p.o1.zx) html += ' <span style="color:#6b7280;font-size:10px;">' + renderZX(p.o1.zx, true) + '</span>';
-        html += ' <span style="color:#34d399;font-size:10px;">' + (p.o1.p*100).toFixed(1) + '%</span>';
-      }
-      if (p.o2) {
-        html += ' <span style="font-size:11px;color:#94a3b8;">2阶:</span> <span style="font-family:monospace;">' + renderBits(p.o2.bits) + '</span>';
-        if (p.o2.zx) html += ' <span style="color:#6b7280;font-size:10px;">' + renderZX(p.o2.zx, true) + '</span>';
-        html += ' <span style="color:#34d399;font-size:10px;">' + (p.o2.p*100).toFixed(1) + '%</span>';
+        html += '<span style="font-family:monospace;font-size:12px;font-weight:700;letter-spacing:0.08em;">' + renderBits(p.o1.bits) + '</span>';
+        if (p.o1.zx) html += '<span style="font-size:9px;color:#94a3b8;">' + renderZX(p.o1.zx, true) + '</span>';
+        html += '<span style="font-size:9px;color:#34d399;margin-left:auto;">' + (p.o1.p*100).toFixed(1) + '%</span>';
+      } else {
+        html += '<span style="font-size:9px;color:#4b5563;">数据不足</span>';
       }
       html += '</div>';
+      // 2阶行
+      html += '<div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-top:1px solid rgba(42,42,74,0.5);">';
+      html += '<span style="font-size:9px;color:#6b6b8a;min-width:18px;">2阶</span>';
+      if (p.o2) {
+        html += '<span style="font-family:monospace;font-size:12px;font-weight:700;letter-spacing:0.08em;">' + renderBits(p.o2.bits) + '</span>';
+        if (p.o2.zx) html += '<span style="font-size:9px;color:#94a3b8;">' + renderZX(p.o2.zx, true) + '</span>';
+        html += '<span style="font-size:9px;color:#34d399;margin-left:auto;">' + (p.o2.p*100).toFixed(1) + '%</span>';
+      } else {
+        html += '<span style="font-size:9px;color:#4b5563;">数据不足</span>';
+      }
+      html += '</div>';
+      html += '</div>';
     }
+    html += '</div>';
     var d = new Date();
     var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
     snapContent.innerHTML = html;
