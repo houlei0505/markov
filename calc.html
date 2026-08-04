@@ -188,6 +188,7 @@
   var currentPayload = null;
   var OFFLINE_TIMEOUT = 10000;
   var lastPingTs = 0;
+  var lastVid = null;  // 追踪上一次的房间ID，用于检测退出房间
 
   // ── DOM refs ──
   var connEl      = document.getElementById('conn-indicator');
@@ -258,8 +259,22 @@
     connEl.className = online ? 'online' : 'offline';
   }
 
+  // ── 清空快照 ──
+  function clearSnapshot() {
+    currentPayload = null;
+    snapContent.textContent = '尚未固定任何预测';
+    snapTime.textContent = '';
+  }
+
   // ── 渲染函数 ──
   function render(payload) {
+    // 检测退出房间：上次有 vid，这次没有 → 清空快照
+    var newVid = payload.vid || null;
+    if (lastVid && !newVid) {
+      clearSnapshot();
+    }
+    lastVid = newVid;
+
     currentPayload = payload;
     var d = new Date(payload.ts);
     var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
