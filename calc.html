@@ -32,7 +32,47 @@
   }
   #conn-indicator.online  { background: #34d399; box-shadow: 0 0 6px #34d399; }
   #conn-indicator.offline { background: #f87171; }
+  #conn-indicator.waiting { background: #fbbf24; }
 
+  /* ── 诊断面板 ── */
+  #diag-box {
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(100,116,139,0.4);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    line-height: 1.8;
+  }
+  #diag-box summary {
+    cursor: pointer;
+    color: #64748b;
+    user-select: none;
+    font-size: 11px;
+  }
+  #diag-box summary:hover { color: #94a3b8; }
+  .diag-row { display: flex; justify-content: space-between; gap: 8px; }
+  .diag-label { color: #475569; flex-shrink: 0; }
+  .diag-val   { color: #94a3b8; text-align: right; word-break: break-all; }
+  .diag-ok    { color: #34d399; }
+  .diag-warn  { color: #fbbf24; }
+  .diag-err   { color: #f87171; }
+  #diag-log {
+    margin-top: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 10px;
+    color: #475569;
+    border-top: 1px solid rgba(100,116,139,0.2);
+    padding-top: 4px;
+  }
+  #diag-log div { padding: 1px 0; }
+  #diag-log div.ok   { color: #34d399; }
+  #diag-log div.warn { color: #fbbf24; }
+  #diag-log div.err  { color: #f87171; }
+
+  /* ── 状态栏 ── */
   #status-bar {
     background: rgba(124,58,237,0.1);
     border: 1px solid rgba(124,58,237,0.3);
@@ -47,17 +87,16 @@
     flex-wrap: wrap;
     gap: 4px;
   }
-  #quota-text { font-size: 11px; }
   .quota-ok   { color: #34d399; font-weight: 700; }
   .quota-warn { color: #fbbf24; font-weight: 700; }
   .quota-out  { color: #f87171; font-weight: 700; }
 
+  /* ── 预测卡片 ── */
   #grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 10px;
   }
-
   .road-card {
     background: rgba(15,15,26,0.9);
     border: 1.5px solid rgba(124,58,237,0.3);
@@ -66,7 +105,6 @@
     transition: border-color 0.2s;
   }
   .road-card.consensus { border-color: #34d399; }
-
   .road-card-header {
     background: rgba(124,58,237,0.15);
     padding: 6px 12px;
@@ -77,108 +115,60 @@
     justify-content: space-between;
     align-items: center;
   }
-  .road-card-header .badge-consensus {
-    font-size: 10px;
-    color: #34d399;
+  .badge-consensus {
+    font-size: 10px; color: #34d399;
     background: rgba(52,211,153,0.1);
     border: 1px solid rgba(52,211,153,0.3);
-    border-radius: 4px;
-    padding: 1px 5px;
+    border-radius: 4px; padding: 1px 5px;
   }
   .road-card-body { padding: 8px 12px; }
-
   .order-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(42,42,74,0.5);
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; border-bottom: 1px solid rgba(42,42,74,0.5);
   }
   .order-row:last-child { border-bottom: none; }
   .order-label { font-size: 10px; color: #6b6b8a; min-width: 24px; }
-
-  .bits-box {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-  }
-  .b0 { color: #ff4d4f; }  /* 0=红/庄 */
-  .b1 { color: #4da6ff; }  /* 1=蓝/闲 */
-
+  .bits-box { display: flex; align-items: center; gap: 6px; font-family: "Courier New", monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; }
+  .b0 { color: #ff4d4f; }
+  .b1 { color: #4da6ff; }
   .zx-label { font-size: 10px; color: #94a3b8; }
-  .zx-label .b0 { font-size: 10px; }
-  .zx-label .b1 { font-size: 10px; }
-
   .prob { font-size: 10px; color: #34d399; }
   .insufficient { font-size: 10px; color: #6b6b8a; padding: 4px 0; }
 
-  #no-data {
-    text-align: center;
-    padding: 40px 20px;
-    color: #4b5563;
-  }
-  #no-data .hint {
-    font-size: 12px;
-    margin-top: 8px;
-    color: #374151;
-    line-height: 1.7;
-  }
+  #no-data { text-align: center; padding: 40px 20px; color: #4b5563; }
+  #no-data .hint { font-size: 12px; margin-top: 8px; color: #374151; line-height: 1.7; }
+  #limit-overlay { text-align: center; padding: 30px 20px; display: none; }
 
-  #limit-overlay {
-    text-align: center;
-    padding: 30px 20px;
-    display: none;
-  }
-
-  /* 快照区 */
-  #snapshot-section {
-    margin-top: 16px;
-    border-top: 1px solid rgba(124,58,237,0.2);
-    padding-top: 12px;
-  }
-  #snapshot-section h2 {
-    font-size: 12px;
-    color: #ea580c;
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  #snap-btn-pin {
-    padding: 5px 14px;
-    background: linear-gradient(135deg, #ea580c, #c2410c);
-    border: none;
-    border-radius: 6px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-  }
+  /* ── 快照 ── */
+  #snapshot-section { margin-top: 16px; border-top: 1px solid rgba(124,58,237,0.2); padding-top: 12px; }
+  #snapshot-section h2 { font-size: 12px; color: #ea580c; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  #snap-btn-pin { padding: 5px 14px; background: linear-gradient(135deg,#ea580c,#c2410c); border: none; border-radius: 6px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
   #snap-btn-pin:hover { opacity: 0.85; }
-  #snap-content {
-    background: rgba(234,88,12,0.05);
-    border: 1px solid rgba(234,88,12,0.2);
-    border-radius: 8px;
-    padding: 8px 12px;
-    min-height: 48px;
-    font-size: 11px;
-    color: #94a3b8;
-  }
+  #snap-content { background: rgba(234,88,12,0.05); border: 1px solid rgba(234,88,12,0.2); border-radius: 8px; padding: 8px 12px; min-height: 48px; font-size: 11px; color: #94a3b8; }
   #snap-time { font-size: 10px; color: #4b5563; margin-top: 4px; }
-
   #last-update { font-size: 10px; color: #374151; margin-top: 10px; text-align: right; }
 </style>
 </head>
 <body>
 
 <h1>
-  <span id="conn-indicator"></span>
+  <span id="conn-indicator" class="waiting"></span>
   🔮 马尔科夫预测面板
 </h1>
+
+<!-- ── 诊断面板 ── -->
+<details id="diag-box" open>
+  <summary>🔧 诊断信息（排查问题用，正常运行后可折叠）</summary>
+  <div style="margin-top:8px;">
+    <div class="diag-row"><span class="diag-label">本页协议</span><span class="diag-val" id="d-protocol">-</span></div>
+    <div class="diag-row"><span class="diag-label">BroadcastChannel</span><span class="diag-val" id="d-bc">-</span></div>
+    <div class="diag-row"><span class="diag-label">收到消息次数</span><span class="diag-val" id="d-msgcount">0</span></div>
+    <div class="diag-row"><span class="diag-label">最后消息时间</span><span class="diag-val" id="d-lastmsg">从未</span></div>
+    <div class="diag-row"><span class="diag-label">消息来源VID</span><span class="diag-val" id="d-vid">-</span></div>
+    <div class="diag-row"><span class="diag-label">最后原始数据</span><span class="diag-val" id="d-raw" style="max-width:200px;overflow:hidden;white-space:nowrap;">-</span></div>
+  </div>
+  <div id="diag-log"></div>
+</details>
 
 <div id="status-bar">
   <span id="room-info">等待百家乐页面数据...</span>
@@ -195,95 +185,122 @@
   <div style="font-size:32px;">📡</div>
   <div>等待数据中...</div>
   <div class="hint">
-    1. 打开百家乐页面（标签页 A）<br>
-    2. 确保油猴脚本已启用<br>
-    3. 进入游戏房间后此面板自动更新
+    1. 确保百家乐页面和本页面在<b>同一浏览器</b>的不同标签页<br>
+    2. 打开油猴脚本面板确认脚本已启用（绿色●）<br>
+    3. 刷新百家乐页面，F12 Console 看是否有 [MK] 日志<br>
+    4. 进入游戏房间后此面板自动更新
   </div>
 </div>
 
 <div id="grid" style="display:none;"></div>
 
 <div id="snapshot-section">
-  <h2>
-    📌 快照
-    <button id="snap-btn-pin">固定当前预测</button>
-  </h2>
+  <h2>📌 快照<button id="snap-btn-pin">固定当前预测</button></h2>
   <div id="snap-content">尚未固定任何预测</div>
   <div id="snap-time"></div>
 </div>
-
 <div id="last-update"></div>
 
 <script>
 (function() {
-  var OFFLINE_TIMEOUT = 10000; // 10 秒无心跳视为离线
+
+  var msgCount = 0;
+  var currentPayload = null;
+  var OFFLINE_TIMEOUT = 10000;
   var lastPingTs = 0;
 
-  var connEl    = document.getElementById('conn-indicator');
-  var roomEl    = document.getElementById('room-info');
-  var quotaEl   = document.getElementById('quota-text');
-  var gridEl    = document.getElementById('grid');
-  var noDataEl  = document.getElementById('no-data');
-  var limitEl   = document.getElementById('limit-overlay');
-  var updateEl  = document.getElementById('last-update');
+  // ── DOM refs ──
+  var connEl      = document.getElementById('conn-indicator');
+  var roomEl      = document.getElementById('room-info');
+  var quotaEl     = document.getElementById('quota-text');
+  var gridEl      = document.getElementById('grid');
+  var noDataEl    = document.getElementById('no-data');
+  var limitEl     = document.getElementById('limit-overlay');
+  var updateEl    = document.getElementById('last-update');
   var snapContent = document.getElementById('snap-content');
   var snapTime    = document.getElementById('snap-time');
 
-  var currentPayload = null;
+  // ── 诊断 refs ──
+  var dProtocol = document.getElementById('d-protocol');
+  var dBc       = document.getElementById('d-bc');
+  var dMsgCount = document.getElementById('d-msgcount');
+  var dLastMsg  = document.getElementById('d-lastmsg');
+  var dVid      = document.getElementById('d-vid');
+  var dRaw      = document.getElementById('d-raw');
+  var dLog      = document.getElementById('diag-log');
 
-  // ── BroadcastChannel 接收（主要通道，跨域名均可收到）──
-  try {
-    var bc = new BroadcastChannel('mk_channel');
-    bc.onmessage = function(e) {
-      if (e.data && e.data.ts) {
-        lastPingTs = Date.now();
-        setOnline(true);
-        render(e.data);
-      }
-    };
-  } catch(ex) {
-    console.warn('[calc] BroadcastChannel 不支持，仅靠 localStorage');
+  function log(msg, type) {
+    var d = new Date();
+    var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+    var div = document.createElement('div');
+    div.className = type || '';
+    div.textContent = '[' + ts + '] ' + msg;
+    dLog.insertBefore(div, dLog.firstChild);
+    // 最多保留30条
+    while (dLog.children.length > 30) dLog.removeChild(dLog.lastChild);
   }
 
-  // ── localStorage 兜底（同域场景）──
-  window.addEventListener('storage', function(e) {
-    if (e.key === 'mk_ping') {
-      lastPingTs = Date.now();
-      setOnline(true);
-    }
-    if (e.key === 'mk_road_data' && e.newValue) {
-      try { render(JSON.parse(e.newValue)); } catch(ex) {}
-    }
-  });
+  // ── 显示本页协议 ──
+  dProtocol.textContent = window.location.protocol + '//' + (window.location.hostname || 'file');
+  log('页面加载，协议: ' + window.location.protocol);
 
-  // 定期检测在线状态
+  // ── BroadcastChannel ──
+  var bc = null;
+  try {
+    bc = new BroadcastChannel('mk_channel');
+    dBc.textContent = '✅ 已创建，频道: mk_channel';
+    dBc.className = 'diag-val diag-ok';
+    log('BroadcastChannel 创建成功', 'ok');
+
+    bc.onmessage = function(e) {
+      msgCount++;
+      lastPingTs = Date.now();
+      dMsgCount.textContent = msgCount;
+      var d = new Date();
+      dLastMsg.textContent = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+      dLastMsg.className = 'diag-val diag-ok';
+
+      var raw = JSON.stringify(e.data).substring(0, 80) + '...';
+      dRaw.textContent = raw;
+      if (e.data && e.data.vid) {
+        dVid.textContent = e.data.vid;
+        dVid.className = 'diag-val diag-ok';
+      }
+
+      log('收到消息 #' + msgCount + ' vid=' + (e.data && e.data.vid ? e.data.vid : '大厅'), 'ok');
+      setOnline(true);
+      try { render(e.data); } catch(ex) { log('render错误: ' + ex.message, 'err'); }
+    };
+
+    bc.onerror = function(e) {
+      log('BroadcastChannel 错误: ' + e, 'err');
+    };
+
+  } catch(ex) {
+    dBc.textContent = '❌ 创建失败: ' + ex.message;
+    dBc.className = 'diag-val diag-err';
+    log('BroadcastChannel 创建失败: ' + ex.message, 'err');
+  }
+
+  // ── 在线状态检测 ──
   setInterval(function() {
     if (lastPingTs && Date.now() - lastPingTs > OFFLINE_TIMEOUT) {
       setOnline(false);
+      log('超过10秒无消息，标记为离线', 'warn');
     }
-  }, 2000);
+  }, 3000);
 
   function setOnline(online) {
     connEl.className = online ? 'online' : 'offline';
   }
 
+  // ── 渲染函数 ──
   function render(payload) {
     currentPayload = payload;
-
-    // 在线检测
-    if (payload.ts && Date.now() - payload.ts < OFFLINE_TIMEOUT) {
-      lastPingTs = payload.ts;
-      setOnline(true);
-    }
-
-    // 更新时间
     var d = new Date(payload.ts);
-    var hh = d.getHours().toString().padStart(2,'0');
-    var mm = d.getMinutes().toString().padStart(2,'0');
-    var ss = d.getSeconds().toString().padStart(2,'0');
-    updateEl.textContent = '最后更新: ' + hh + ':' + mm + ':' + ss;
+    var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+    updateEl.textContent = '最后更新: ' + ts;
 
-    // 房间 + 统计
     if (payload.vid && payload.stats) {
       roomEl.textContent = '房间 ' + payload.vid +
         ' | 庄' + payload.stats.zhuang +
@@ -294,7 +311,6 @@
       roomEl.textContent = '大厅中（未进入房间）';
     }
 
-    // 额度
     if (payload.limitReached) {
       quotaEl.innerHTML = '<span class="quota-out">额度已用完</span>';
     } else if (payload.remaining <= 10) {
@@ -303,7 +319,6 @@
       quotaEl.innerHTML = '今日剩余 <span class="quota-ok">' + payload.remaining + '</span> 次';
     }
 
-    // 额度用完
     if (payload.limitReached) {
       noDataEl.style.display = 'none';
       gridEl.style.display   = 'none';
@@ -312,7 +327,6 @@
     }
     limitEl.style.display = 'none';
 
-    // 无房间数据
     if (!payload.vid || !payload.predictions || !payload.predictions.length) {
       noDataEl.style.display = 'block';
       gridEl.style.display   = 'none';
@@ -322,43 +336,28 @@
     noDataEl.style.display = 'none';
     gridEl.style.display   = 'grid';
 
-    // 渲染预测卡片
     var html = '';
     for (var i = 0; i < payload.predictions.length; i++) {
       var p = payload.predictions[i];
       html += '<div class="road-card' + (p.consensus ? ' consensus' : '') + '">';
-      html += '<div class="road-card-header">';
-      html += '<span>' + escHtml(p.name) + '</span>';
+      html += '<div class="road-card-header"><span>' + escHtml(p.name) + '</span>';
       if (p.consensus) html += '<span class="badge-consensus">✅ 一致</span>';
-      html += '</div>';
-      html += '<div class="road-card-body">';
+      html += '</div><div class="road-card-body">';
 
-      // 一阶
-      html += '<div class="order-row">';
-      html += '<span class="order-label">1阶</span>';
+      html += '<div class="order-row"><span class="order-label">1阶</span>';
       if (p.o1) {
-        html += '<div class="bits-box">';
-        html += renderBits(p.o1.bits);
+        html += '<div class="bits-box">' + renderBits(p.o1.bits);
         if (p.o1.zx) html += '<span class="zx-label">(' + renderBits(p.o1.zx, true) + ')</span>';
-        html += '<span class="prob">' + (p.o1.p * 100).toFixed(2) + '%</span>';
-        html += '</div>';
-      } else {
-        html += '<span class="insufficient">数据不足</span>';
-      }
+        html += '<span class="prob">' + (p.o1.p * 100).toFixed(2) + '%</span></div>';
+      } else { html += '<span class="insufficient">数据不足</span>'; }
       html += '</div>';
 
-      // 二阶
-      html += '<div class="order-row">';
-      html += '<span class="order-label">2阶</span>';
+      html += '<div class="order-row"><span class="order-label">2阶</span>';
       if (p.o2) {
-        html += '<div class="bits-box">';
-        html += renderBits(p.o2.bits);
+        html += '<div class="bits-box">' + renderBits(p.o2.bits);
         if (p.o2.zx) html += '<span class="zx-label">(' + renderBits(p.o2.zx, true) + ')</span>';
-        html += '<span class="prob">' + (p.o2.p * 100).toFixed(2) + '%</span>';
-        html += '</div>';
-      } else {
-        html += '<span class="insufficient">数据不足</span>';
-      }
+        html += '<span class="prob">' + (p.o2.p * 100).toFixed(2) + '%</span></div>';
+      } else { html += '<span class="insufficient">数据不足</span>'; }
       html += '</div>';
 
       html += '</div></div>';
@@ -367,7 +366,6 @@
   }
 
   function renderBits(bits, small) {
-    // bits: '0101...'  0=庄红  1=闲蓝
     var size = small ? 'font-size:10px;' : '';
     return bits.split('').map(function(b) {
       return '<span class="b' + b + '" style="' + size + '">' + b + '</span>';
@@ -375,13 +373,10 @@
   }
 
   function escHtml(s) {
-    return String(s)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // 快照按钮
+  // ── 快照 ──
   document.getElementById('snap-btn-pin').addEventListener('click', function() {
     if (!currentPayload || !currentPayload.predictions) {
       snapContent.textContent = '暂无数据可固定';
@@ -392,24 +387,20 @@
     var ps = currentPayload.predictions;
     for (var i = 0; i < ps.length; i++) {
       var p = ps[i];
-      html += '<div style="margin-bottom:6px;">';
-      html += '<b style="color:#818cf8;">' + escHtml(p.name) + '</b>';
+      html += '<div style="margin-bottom:6px;"><b style="color:#818cf8;">' + escHtml(p.name) + '</b>';
       if (p.consensus) html += ' <span style="color:#34d399;font-size:10px;">✅</span>';
       if (p.o1) {
-        html += ' <span style="font-size:11px;color:#94a3b8;">1阶:</span> ' +
-          '<span style="font-family:monospace;">' + renderBits(p.o1.bits) + '</span>';
+        html += ' <span style="font-size:11px;color:#94a3b8;">1阶:</span> <span style="font-family:monospace;">' + renderBits(p.o1.bits) + '</span>';
         if (p.o1.zx) html += ' <span style="color:#6b7280;font-size:10px;">(' + renderBits(p.o1.zx, true) + ')</span>';
         html += ' <span style="color:#34d399;font-size:10px;">' + (p.o1.p*100).toFixed(1) + '%</span>';
       }
       if (p.o2) {
-        html += ' <span style="font-size:11px;color:#94a3b8;">2阶:</span> ' +
-          '<span style="font-family:monospace;">' + renderBits(p.o2.bits) + '</span>';
+        html += ' <span style="font-size:11px;color:#94a3b8;">2阶:</span> <span style="font-family:monospace;">' + renderBits(p.o2.bits) + '</span>';
         if (p.o2.zx) html += ' <span style="color:#6b7280;font-size:10px;">(' + renderBits(p.o2.zx, true) + ')</span>';
         html += ' <span style="color:#34d399;font-size:10px;">' + (p.o2.p*100).toFixed(1) + '%</span>';
       }
       html += '</div>';
     }
-
     var d = new Date();
     var ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
     snapContent.innerHTML = html;
@@ -422,6 +413,8 @@
       btn.style.background = 'linear-gradient(135deg,#ea580c,#c2410c)';
     }, 1200);
   });
+
+  log('页面初始化完成，等待 BroadcastChannel 消息...', 'warn');
 
 })();
 </script>
