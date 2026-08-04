@@ -338,7 +338,7 @@
       html += '<div class="order-row"><span class="order-label">1阶</span>';
       if (p.o1) {
         html += '<div class="bits-box">' + renderBits(p.o1.bits);
-        if (p.o1.zx) html += '<span class="zx-label">(' + renderBits(p.o1.zx, true) + ')</span>';
+        if (p.o1.zx) html += '<span class="zx-label">' + renderZX(p.o1.zx, true) + '</span>';
         html += '<span class="prob">' + (p.o1.p * 100).toFixed(2) + '%</span></div>';
       } else { html += '<span class="insufficient">数据不足</span>'; }
       html += '</div>';
@@ -346,7 +346,7 @@
       html += '<div class="order-row"><span class="order-label">2阶</span>';
       if (p.o2) {
         html += '<div class="bits-box">' + renderBits(p.o2.bits);
-        if (p.o2.zx) html += '<span class="zx-label">(' + renderBits(p.o2.zx, true) + ')</span>';
+        if (p.o2.zx) html += '<span class="zx-label">' + renderZX(p.o2.zx, true) + '</span>';
         html += '<span class="prob">' + (p.o2.p * 100).toFixed(2) + '%</span></div>';
       } else { html += '<span class="insufficient">数据不足</span>'; }
       html += '</div>';
@@ -356,11 +356,21 @@
     gridEl.innerHTML = html;
   }
 
+  // 渲染派生路红蓝 bits（0=红, 1=蓝），显示数字
   function renderBits(bits, small) {
     var size = small ? 'font-size:10px;' : '';
     return bits.split('').map(function(b) {
       return '<span class="b' + b + '" style="' + size + '">' + b + '</span>';
     }).join('');
+  }
+
+  // 渲染庄闲 zx 字符串（0=庄/红, 1=闲/蓝），显示「庄」/「闲」文字
+  function renderZX(bits, small) {
+    var size = small ? 'font-size:10px;' : '';
+    return '(' + bits.split('').map(function(b) {
+      if (b === '0') return '<span class="b0" style="' + size + '">庄</span>';
+      return '<span class="b1" style="' + size + '">闲</span>';
+    }).join('') + ')';
   }
 
   function escHtml(s) {
@@ -382,12 +392,12 @@
       if (p.consensus) html += ' <span style="color:#34d399;font-size:10px;">✅</span>';
       if (p.o1) {
         html += ' <span style="font-size:11px;color:#94a3b8;">1阶:</span> <span style="font-family:monospace;">' + renderBits(p.o1.bits) + '</span>';
-        if (p.o1.zx) html += ' <span style="color:#6b7280;font-size:10px;">(' + renderBits(p.o1.zx, true) + ')</span>';
+        if (p.o1.zx) html += ' <span style="color:#6b7280;font-size:10px;">' + renderZX(p.o1.zx, true) + '</span>';
         html += ' <span style="color:#34d399;font-size:10px;">' + (p.o1.p*100).toFixed(1) + '%</span>';
       }
       if (p.o2) {
         html += ' <span style="font-size:11px;color:#94a3b8;">2阶:</span> <span style="font-family:monospace;">' + renderBits(p.o2.bits) + '</span>';
-        if (p.o2.zx) html += ' <span style="color:#6b7280;font-size:10px;">(' + renderBits(p.o2.zx, true) + ')</span>';
+        if (p.o2.zx) html += ' <span style="color:#6b7280;font-size:10px;">' + renderZX(p.o2.zx, true) + '</span>';
         html += ' <span style="color:#34d399;font-size:10px;">' + (p.o2.p*100).toFixed(1) + '%</span>';
       }
       html += '</div>';
