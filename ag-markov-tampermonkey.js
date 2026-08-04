@@ -41,7 +41,7 @@
   'use strict';
 
   // ★ 修改计算逻辑后，把这里的版本号递增，才会触发重新拉取 ★
-  var REMOTE_VER = '2.6';
+  var REMOTE_VER = '2.7';
   var SCRIPT_URL = 'https://houlei0505.github.io/markov/ag-markov.js';
 
   // unsafeWindow = 网页真实的 window（能访问 GameBac 等游戏对象）

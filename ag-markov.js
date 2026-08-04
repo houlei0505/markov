@@ -9,8 +9,9 @@
 //   里的 REMOTE_VER 版本号（两个文件要对得上），否则油猴不会
 //   重新拉取，用户看到的还是旧版缓存。
 //
-//   当前版本：2.6
+//   当前版本：2.7
 //   修改历史：
+//     2.7 - 加入详细诊断日志，排查GameBac访问和BC发送问题
 //     2.6 - 修复unsafeWindow沙盒问题，用__win__访问GameBac和BroadcastChannel
 //     2.5 - 零DOM模式，BroadcastChannel通信，calc.html指挥中心
 //     2.4 - 修复大路拐角colLens统计（改用daLuProto）
@@ -308,7 +309,14 @@
 
     // 通过 BroadcastChannel 广播（跨域名标签页均可收到）
     if (bc) {
-      try { bc.postMessage(payload); } catch(e) {}
+      try {
+        bc.postMessage(payload);
+        console.log('[MK] BC消息已发送，vid=' + (currentVid || '大厅') + ' predictions=' + predictions.length);
+      } catch(e) {
+        console.error('[MK] BC发送失败:', e);
+      }
+    } else {
+      console.warn('[MK] BroadcastChannel 不可用，消息未发送');
     }
     // 同时写 localStorage 作为兜底（同域情况）
     try {
@@ -320,6 +328,12 @@
   // ── 启动轮询 ──────────────────────────────────
   function startPolling() {
     if (pollTimer) return;
+
+    // 诊断：检查 GameBac 是否可见
+    console.log('[MK] __win__ 是否有 GameBac:', typeof __win__.GameBac);
+    console.log('[MK] __win__.location:', __win__.location && __win__.location.href);
+    console.log('[MK] BroadcastChannel 实例:', bc ? '已创建' : '创建失败');
+
     computeAndPublish();
     pollTimer = setInterval(computeAndPublish, POLL_INTERVAL);
     console.log('[MK] 数据轮询已启动（零 DOM 模式）');
