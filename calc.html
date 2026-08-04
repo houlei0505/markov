@@ -225,25 +225,28 @@
   // dBc.textContent = '✅ 监听 postMessage（跨域模式）';
   // dBc.className = 'diag-val diag-ok';
 
-  // ── postMessage 接收 ──
-  window.addEventListener('message', function(e) {
-    // 只接受带 predictions 字段的数据，过滤无关消息
-    if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
-
-    msgCount++;
-    lastPingTs = Date.now();
-
-    // 诊断更新（注释掉，排查时取消）
-    // dMsgCount.textContent = msgCount;
-    // var dd = new Date();
-    // dLastMsg.textContent = [dd.getHours(),dd.getMinutes(),dd.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
-    // dLastMsg.className = 'diag-val diag-ok';
-    // dRaw.textContent = JSON.stringify(e.data).substring(0, 80) + '...';
-    // if (e.data.vid) { dVid.textContent = e.data.vid; dVid.className = 'diag-val diag-ok'; }
-
-    setOnline(true);
-    try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
-  });
+  // ── BroadcastChannel 接收（与 tampermonkey 脚本同浏览器通信）──
+  var _bc = null;
+  try {
+    _bc = new BroadcastChannel('mk_channel');
+    _bc.onmessage = function(e) {
+      if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
+      msgCount++;
+      lastPingTs = Date.now();
+      setOnline(true);
+      try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
+    };
+  } catch(err) {
+    console.warn('[MK] BroadcastChannel 不支持，降级到 postMessage');
+    // 降级：兼容旧版 postMessage 方式
+    window.addEventListener('message', function(e) {
+      if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
+      msgCount++;
+      lastPingTs = Date.now();
+      setOnline(true);
+      try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
+    });
+  }
 
   // ── 在线状态检测 ──
   setInterval(function() {
@@ -292,6 +295,10 @@
     if (!payload.vid || !payload.predictions || !payload.predictions.length) {
       noDataEl.style.display = 'block';
       gridEl.style.display   = 'none';
+      // 退出房间时清除快照
+      currentPayload = null;
+      snapContent.textContent = '已退出房间，快照已清除';
+      snapTime.textContent = '';
       return;
     }
 

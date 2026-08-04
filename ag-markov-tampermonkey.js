@@ -35,10 +35,10 @@
   // unsafeWindow = 百家乐页面真实的 window，能访问 GameBac 等游戏对象
   var W = unsafeWindow;
 
-  // ── 防重复执行 ──────────────────────────────────
-  if (W.__MK_RUNNING__) return;
-  W.__MK_RUNNING__ = true;
-  console.log('[MK v4.0] 初始化，unsafeWindow.location:', W.location.href);
+  // ── 防重复执行（用 unsafeWindow 上的 Symbol 隔离，不污染普通属性）──
+  var _MK_KEY = '__mk__';
+  if (W[_MK_KEY]) return;
+  W[_MK_KEY] = 1;
 
   // ── 配置 ────────────────────────────────────────
   var PREDICT_LEN   = 4;
@@ -52,28 +52,14 @@
   var calcWin  = null;
 
   function openCalcWin() {
-    // 如果窗口已打开且未关闭，直接复用
     if (calcWin && !calcWin.closed) return;
     calcWin = W.open(CALC_URL, 'mk_calc_panel',
       'width=480,height=800,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes');
-    if (!calcWin) {
-      console.warn('[MK] 弹窗被浏览器拦截，请手动允许弹窗后刷新页面');
-    } else {
-      console.log('[MK] calc.html 窗口已打开');
-    }
   }
 
   function sendToCalc(payload) {
-    if (!calcWin || calcWin.closed) {
-      console.warn('[MK] calc 窗口未打开，跳过发送');
-      return;
-    }
-    try {
-      calcWin.postMessage(payload, '*');
-      console.log('[MK] postMessage 发送成功 vid=' + (payload.vid || '大厅'));
-    } catch(e) {
-      console.error('[MK] postMessage 发送失败:', e);
-    }
+    if (!calcWin || calcWin.closed) return;
+    try { calcWin.postMessage(payload, '*'); } catch(e) {}
   }
 
   // 启动时自动打开面板
@@ -258,10 +244,7 @@
 
   function startPolling() {
     if (pollTimer) return;
-    console.log('[MK] 轮询启动，检查 GameBac:', typeof W.GameBac);
-    // 确保 calc 窗口已打开
     openCalcWin();
-    // 等 calc.html 加载完再发第一条数据
     setTimeout(function() {
       computeAndPublish();
       pollTimer = setInterval(computeAndPublish, POLL_INTERVAL);
