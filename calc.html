@@ -225,27 +225,26 @@
   // dBc.textContent = '✅ 监听 postMessage（跨域模式）';
   // dBc.className = 'diag-val diag-ok';
 
-  // ── BroadcastChannel 接收（与 tampermonkey 脚本同浏览器通信）──
-  var _bc = null;
+  // ── 统一消息处理函数 ──
+  function handleMessage(data) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.predictions)) return;
+    msgCount++;
+    lastPingTs = Date.now();
+    setOnline(true);
+    try { render(data); } catch(ex) { console.error('[MK render错误]', ex); }
+  }
+
+  // ── 方式1：postMessage 接收（tampermonkey 通过 window.open 打开后发送）──
+  window.addEventListener('message', function(e) {
+    handleMessage(e.data);
+  });
+
+  // ── 方式2：BroadcastChannel 接收（同浏览器同源标签页）──
   try {
-    _bc = new BroadcastChannel('mk_channel');
-    _bc.onmessage = function(e) {
-      if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
-      msgCount++;
-      lastPingTs = Date.now();
-      setOnline(true);
-      try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
-    };
+    var _bc = new BroadcastChannel('mk_channel');
+    _bc.onmessage = function(e) { handleMessage(e.data); };
   } catch(err) {
-    console.warn('[MK] BroadcastChannel 不支持，降级到 postMessage');
-    // 降级：兼容旧版 postMessage 方式
-    window.addEventListener('message', function(e) {
-      if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
-      msgCount++;
-      lastPingTs = Date.now();
-      setOnline(true);
-      try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
-    });
+    console.warn('[MK] BroadcastChannel 不支持');
   }
 
   // ── 在线状态检测 ──
