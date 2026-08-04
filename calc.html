@@ -242,7 +242,7 @@
     // if (e.data.vid) { dVid.textContent = e.data.vid; dVid.className = 'diag-val diag-ok'; }
 
     setOnline(true);
-    try { render(e.data); } catch(ex) {}
+    try { render(e.data); } catch(ex) { console.error('[MK render错误]', ex); }
   });
 
   // ── 在线状态检测 ──
