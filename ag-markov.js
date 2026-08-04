@@ -14,9 +14,13 @@
   var POLL_INTERVAL = 3000;
   var pollTimer     = null;
 
-  // localStorage 通信 key
-  var LS_KEY_DATA  = 'mk_road_data';   // 写给 calc.html 的路单+预测结果
-  var LS_KEY_PING  = 'mk_ping';        // 心跳，让 calc.html 知道脚本在线
+  // BroadcastChannel 跨标签页通信（不受域名隔离限制）
+  var bc = null;
+  try { bc = new BroadcastChannel('mk_channel'); } catch(e) {}
+
+  // localStorage 通信 key（同域备用，兼容不支持 BroadcastChannel 的情况）
+  var LS_KEY_DATA  = 'mk_road_data';
+  var LS_KEY_PING  = 'mk_ping';
 
   // ── 每日计算额度 ──────────────────────────────
   var DAILY_LIMIT      = 60;
@@ -283,9 +287,15 @@
       predictions: predictions
     };
 
-    // 写入 localStorage，calc.html 通过 storage 事件实时接收
-    localStorage.setItem(LS_KEY_DATA, JSON.stringify(payload));
-    localStorage.setItem(LS_KEY_PING, String(Date.now()));
+    // 通过 BroadcastChannel 广播（跨域名标签页均可收到）
+    if (bc) {
+      try { bc.postMessage(payload); } catch(e) {}
+    }
+    // 同时写 localStorage 作为兜底（同域情况）
+    try {
+      localStorage.setItem(LS_KEY_DATA, JSON.stringify(payload));
+      localStorage.setItem(LS_KEY_PING, String(Date.now()));
+    } catch(e) {}
   }
 
   // ── 启动轮询 ──────────────────────────────────
