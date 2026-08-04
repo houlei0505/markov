@@ -295,10 +295,6 @@
     if (!payload.vid || !payload.predictions || !payload.predictions.length) {
       noDataEl.style.display = 'block';
       gridEl.style.display   = 'none';
-      // 退出房间时清除快照
-      currentPayload = null;
-      snapContent.textContent = '已退出房间，快照已清除';
-      snapTime.textContent = '';
       return;
     }
 
