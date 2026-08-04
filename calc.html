@@ -161,7 +161,7 @@
   <summary>🔧 诊断信息（排查问题用，正常运行后可折叠）</summary>
   <div style="margin-top:8px;">
     <div class="diag-row"><span class="diag-label">本页协议</span><span class="diag-val" id="d-protocol">-</span></div>
-    <div class="diag-row"><span class="diag-label">BroadcastChannel</span><span class="diag-val" id="d-bc">-</span></div>
+    <div class="diag-row"><span class="diag-label">通信方式</span><span class="diag-val" id="d-bc">-</span></div>
     <div class="diag-row"><span class="diag-label">收到消息次数</span><span class="diag-val" id="d-msgcount">0</span></div>
     <div class="diag-row"><span class="diag-label">最后消息时间</span><span class="diag-val" id="d-lastmsg">从未</span></div>
     <div class="diag-row"><span class="diag-label">消息来源VID</span><span class="diag-val" id="d-vid">-</span></div>
@@ -244,43 +244,34 @@
   dProtocol.textContent = window.location.protocol + '//' + (window.location.hostname || 'file');
   log('页面加载，协议: ' + window.location.protocol);
 
-  // ── BroadcastChannel ──
-  var bc = null;
-  try {
-    bc = new BroadcastChannel('mk_channel');
-    dBc.textContent = '✅ 已创建，频道: mk_channel';
-    dBc.className = 'diag-val diag-ok';
-    log('BroadcastChannel 创建成功', 'ok');
+  // ── postMessage 接收（油猴脚本通过 window.open 打开本页，用 postMessage 跨域发数据）──
+  // BroadcastChannel 受同源限制，跨域无效；改用 postMessage 彻底解决跨域问题。
+  dBc.textContent = '✅ 监听 postMessage（跨域模式）';
+  dBc.className = 'diag-val diag-ok';
+  log('postMessage 监听已注册', 'ok');
 
-    bc.onmessage = function(e) {
-      msgCount++;
-      lastPingTs = Date.now();
-      dMsgCount.textContent = msgCount;
-      var d = new Date();
-      dLastMsg.textContent = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
-      dLastMsg.className = 'diag-val diag-ok';
+  window.addEventListener('message', function(e) {
+    // 只接受带 predictions 字段的数据，过滤无关消息
+    if (!e.data || typeof e.data !== 'object' || !Array.isArray(e.data.predictions)) return;
 
-      var raw = JSON.stringify(e.data).substring(0, 80) + '...';
-      dRaw.textContent = raw;
-      if (e.data && e.data.vid) {
-        dVid.textContent = e.data.vid;
-        dVid.className = 'diag-val diag-ok';
-      }
+    msgCount++;
+    lastPingTs = Date.now();
+    dMsgCount.textContent = msgCount;
+    var d = new Date();
+    dLastMsg.textContent = [d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return n.toString().padStart(2,'0');}).join(':');
+    dLastMsg.className = 'diag-val diag-ok';
 
-      log('收到消息 #' + msgCount + ' vid=' + (e.data && e.data.vid ? e.data.vid : '大厅'), 'ok');
-      setOnline(true);
-      try { render(e.data); } catch(ex) { log('render错误: ' + ex.message, 'err'); }
-    };
+    var raw = JSON.stringify(e.data).substring(0, 80) + '...';
+    dRaw.textContent = raw;
+    if (e.data.vid) {
+      dVid.textContent = e.data.vid;
+      dVid.className = 'diag-val diag-ok';
+    }
 
-    bc.onerror = function(e) {
-      log('BroadcastChannel 错误: ' + e, 'err');
-    };
-
-  } catch(ex) {
-    dBc.textContent = '❌ 创建失败: ' + ex.message;
-    dBc.className = 'diag-val diag-err';
-    log('BroadcastChannel 创建失败: ' + ex.message, 'err');
-  }
+    log('收到消息 #' + msgCount + ' 来源=' + e.origin + ' vid=' + (e.data.vid || '大厅'), 'ok');
+    setOnline(true);
+    try { render(e.data); } catch(ex) { log('render错误: ' + ex.message, 'err'); }
+  });
 
   // ── 在线状态检测 ──
   setInterval(function() {

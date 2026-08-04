@@ -43,14 +43,39 @@
   var POLL_INTERVAL = 3000;
   var pollTimer     = null;
 
-  // BroadcastChannel：在 unsafeWindow 上创建，确保和 calc.html 同域通信
-  var bc = null;
-  try {
-    bc = new W.BroadcastChannel('mk_channel');
-    console.log('[MK] BroadcastChannel 创建成功');
-  } catch(e) {
-    console.error('[MK] BroadcastChannel 创建失败:', e);
+  // ── 通信：postMessage 到 calc.html 子窗口 ──────────
+  // BroadcastChannel 受同源限制，跨域标签页收不到消息。
+  // 改用 window.open 打开 calc.html，通过 postMessage 跨域发送数据。
+  var CALC_URL = 'https://houlei0505.github.io/markov/calc.html';
+  var calcWin  = null;
+
+  function openCalcWin() {
+    // 如果窗口已打开且未关闭，直接复用
+    if (calcWin && !calcWin.closed) return;
+    calcWin = W.open(CALC_URL, 'mk_calc_panel',
+      'width=480,height=800,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes');
+    if (!calcWin) {
+      console.warn('[MK] 弹窗被浏览器拦截，请手动允许弹窗后刷新页面');
+    } else {
+      console.log('[MK] calc.html 窗口已打开');
+    }
   }
+
+  function sendToCalc(payload) {
+    if (!calcWin || calcWin.closed) {
+      console.warn('[MK] calc 窗口未打开，跳过发送');
+      return;
+    }
+    try {
+      calcWin.postMessage(payload, '*');
+      console.log('[MK] postMessage 发送成功 vid=' + (payload.vid || '大厅'));
+    } catch(e) {
+      console.error('[MK] postMessage 发送失败:', e);
+    }
+  }
+
+  // 启动时自动打开面板
+  openCalcWin();
 
   // ── 每日计算额度 ──────────────────────────────
   var DAILY_LIMIT       = 60;
@@ -228,21 +253,19 @@
       predictions: predictions
     };
 
-    if (bc) {
-      try {
-        bc.postMessage(payload);
-        console.log('[MK] 广播成功 vid=' + (vid||'大厅'));
-      } catch(e) {
-        console.error('[MK] 广播失败:', e);
-      }
-    }
+    sendToCalc(payload);
   }
 
   function startPolling() {
     if (pollTimer) return;
     console.log('[MK] 轮询启动，检查 GameBac:', typeof W.GameBac);
-    computeAndPublish();
-    pollTimer = setInterval(computeAndPublish, POLL_INTERVAL);
+    // 确保 calc 窗口已打开
+    openCalcWin();
+    // 等 calc.html 加载完再发第一条数据
+    setTimeout(function() {
+      computeAndPublish();
+      pollTimer = setInterval(computeAndPublish, POLL_INTERVAL);
+    }, 2000);
   }
 
   // 延迟启动，等游戏引擎加载完
