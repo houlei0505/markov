@@ -186,6 +186,7 @@
       for (var t=1;t<=2;t++) { if(simulateDerivedColor(cl,lt,ll,t,gap)===pRed){matched=t;break;} }
       if (!matched) matched=lt;
       result += (matched===1)?'0':'1';
+      // 假设本把未中（对立面出现），用对立面更新大路状态推算下一把
       var actual=matched===1?2:1;
       if (actual===lt) { ll++; cl[cl.length-1]=ll; } else { cl.push(1); lt=actual; ll=1; }
     }

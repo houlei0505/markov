@@ -733,6 +733,7 @@ function derivedBitsToZX(predictedBits, colLens, lastColType, lastColLen, gapCol
     }
     if (matched === 0) matched = lt;
     result += (matched === 1) ? '0' : '1';
+    // 假设本把未中（对立面出现），用对立面更新大路状态推算下一把
     var actual = matched === 1 ? 2 : 1;
     if (actual === lt) {
       ll++;
